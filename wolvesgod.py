@@ -79,20 +79,26 @@ class Tracker:
 		for role in data['roles']:
 			role['id'] = role['id'].replace('random-village', 'random-villager')
 
+			if role['id'] == 'random-other':
+				role['name'] = 'RO'
+
 			if role['name'] == 'Random regular villager':
 				role['name'] = 'RRV'
 
-			if role['name'] == 'Random strong villager':
+			elif role['name'] == 'Random strong villager':
 				role['name'] = 'RSV'
 
-			if role['name'] == 'Random werewolf':
+			elif role['name'] == 'Random werewolf':
 				role['name'] = 'RW'
 
-			if role['name'] == 'Random killer':
+			elif role['name'] == 'Random killer':
 				role['name'] = 'RK'
 
-			if role['name'] == 'Random voting':
+			elif role['name'] == 'Random voting':
 				role['name'] = 'RV'
+
+			elif role['name'] == 'Random other':
+				role['name'] = 'RO'
 
 			if role['team'] == 'RANDOM_VILLAGER':
 				role['team'] = 'VILLAGER'
@@ -113,6 +119,8 @@ class Tracker:
 		roles['cursed'] = roles.pop('cursed-human')
 
 		roles['red-lady'] = roles.pop('harlot')
+
+		roles['random-other'] = roles.pop('random-others')
 
 		roles['random-werewolf-weak'] = {
 			'team': 'WEREWOLF',
@@ -155,6 +163,7 @@ class Tracker:
 					for l in range(len(rotations[gamemode][i][j])):
 						if 'role' in rotations[gamemode][i][j][l]:
 							rotations[gamemode][i][j][l] = rotations[gamemode][i][j][l]['role']
+							rotations[gamemode][i][j][l] = rotations[gamemode][i][j][l].replace('random-village', 'random-villager')
 
 							if rotations[gamemode][i][j][l] == 'cursed-human':
 								rotations[gamemode][i][j][l] = 'cursed'
@@ -162,15 +171,23 @@ class Tracker:
 							elif rotations[gamemode][i][j][l] == 'harlot':
 								rotations[gamemode][i][j][l] = 'red-lady'
 
+							elif rotations[gamemode][i][j][l] == 'random-villager-other':
+								rotations[gamemode][i][j][l] = 'random-other'
+
 						else:
 							rotations[gamemode][i][j][l] = rotations[gamemode][i][j][l]['roles']
 
 							for k in range(len(rotations[gamemode][i][j][l])):
+								rotations[gamemode][i][j][l][k] = rotations[gamemode][i][j][l][k].replace('random-village', 'random-villager')
+
 								if rotations[gamemode][i][j][l][k] == 'cursed-human':
 									rotations[gamemode][i][j][l][k] = 'cursed'
 
 								elif rotations[gamemode][i][j][l][k] == 'harlot':
 									rotations[gamemode][i][j][l][k] = 'red-lady'
+
+								elif rotations[gamemode][i][j][l][k] == 'random-villager-other':
+									rotations[gamemode][i][j][l][k] = 'random-other'
 
 		return rotations
 
@@ -819,8 +836,6 @@ class TrackerV2(Tracker):
 				break
 
 		for r in range(len(rotation)):
-			rotation[r] = rotation[r].replace('random-village', 'random-villager')
-
 			if rotation[r] not in roles:
 				for advanced_role in self.ADVANCED_ROLES.get(rotation[r], []):
 					if advanced_role in roles:
@@ -888,16 +903,20 @@ class TrackerV2(Tracker):
 				return
 
 			elif 'убил' in service_message:
-				if 'убили' in service_message:
-					sep = ' убили '
-
-				elif 'убила' in service_message:
-					sep = ' убила '
+				if 'дождь' in service_message:
+					player = service_message.split(' дождь на ')[1].split(' и убил его.')[0]
 
 				else:
-					sep = ' убил '
+					if 'убили' in service_message:
+						sep = ' убили '
 
-				player = service_message.split(sep)[1].replace('.', '')
+					elif 'убила' in service_message:
+						sep = ' убила '
+
+					else:
+						sep = ' убил '
+
+					player = service_message.split(sep)[1].replace('.', '')
 
 			elif 'взрывом' in service_message:
 				player = service_message.split(' был убит взрывом!')[0]
@@ -926,19 +945,48 @@ class TrackerV2(Tracker):
 
 					continue
 
+			elif 'камень' in service_message:
+				players = service_message.split(' и убил его')[0].split(' бросил камень в ')
+
+				for p in range(2):
+					number = int(players[p].split(' ')[0]) - 1
+					name = players[p].split(' ')[1]	
+
+					if '/' in service_message:
+						role = players[p].split(' / ')[1].split(')')[0]
+
+					print(number, name, role)
+
+					self.set_name(number, name)
+					self.PLAYERS[number]['dead'] = not p
+
+					if role:
+						self.set_role(number, role)
+
+				continue
+
 			elif 'казнил' in service_message:
 				player = service_message.split(' ночью. ')[1].split(' умер.')[0]
+
+			elif 'Меч' in service_message:
+				player = service_message.split(' чтобы убить')[1]
 
 			elif 'Куртизанка' in service_message:
 				player = service_message.split(' посетил ')[0]
 				role = 'Red lady'
 
-			elif 'отомщена' in service_message:
-				player = service_message.split(' отомщена, ')[1].split(' погиб!')[0]
-
 			elif 'раскрыть роль' in service_message:
 				player = service_message.split(' раскрыть роль ')[1]
 				dead = False
+
+			elif 'раскрыл роль' in service_message:
+				player = service_message.split(' раскрыл роль ')[1]
+				dead = False
+
+			elif 'отомщена' in service_message:
+				player = service_message.split(' отомщена, ')[1].split(' погиб!')[0]
+
+				print(player)
 
 			elif 'мэр!' in service_message:
 				player = service_message.split('Игрок ')[1].split(' - ')[0]
@@ -1114,7 +1162,7 @@ class TrackerV2(Tracker):
 							role = 'red-lady'
 
 						elif 'rolechanges' in role:
-							role = 'random-others'
+							role = 'random-other'
 
 						for _ in range(2):
 							if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
@@ -1241,16 +1289,9 @@ class Miner:
 
 				return
 
-			if self.wait('close_mark.png', confidence=0.99, check_fail=True):
-				self.back()
+			time.sleep(35)
 
-			else:
-				pyautogui.moveTo(100, 100)
-
-				time.sleep(3)
-
-				if not self.wait('close_mark.png', confidence=0.99, check_fail=True, check_count=1, click=False):
-					self.back()
+			self.back()
 
 			if self.wait('spin.png', confidence=0.8, check_fail=True):
 				print(f'{Style.BRIGHT}{Fore.RED}Spin button not found.')
@@ -1321,7 +1362,6 @@ class Grinder:
 		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + r'\\Google\\Chrome\\User Data\\WolvesGod'
 		self.user_agent = UserAgent(verify_ssl=False)
 		self.page = None
-		self.EMOJI_NUMBER = 2
 
 	def act_villager(self):
 		print(f'{Style.BRIGHT}{Fore.GREEN}You are not a werewolf!')
@@ -1330,15 +1370,6 @@ class Grinder:
 		start_time = time.monotonic()
 
 		print(f'{Style.BRIGHT}{Fore.RED}You are a werewolf!')
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Sending emoji...')
-
-		self.page.get_by_text('\uf582').click(timeout=10000)
-
-		time.sleep(1)
-
-		self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[3]/div/div[2]/div[2]/div/div/div/div[{self.EMOJI_NUMBER}]/div/div/div/img').click(timeout=10000)
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}Emoji sent!')
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
 
 		players = []
