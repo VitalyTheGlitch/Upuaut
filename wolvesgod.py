@@ -1423,16 +1423,19 @@ class Grinder:
 								tag = True
 
 							else:
-								vote = False 
+								vote = False
 
-						elif not player['self']:
-							if 'lovers' in icon:
-								player['couple'] = True
+						elif 'wolf_seer' in icon:
+							if player['self']:
+								vote = False
 
-								couples.append(4 * (i - 1) + j)
-
-							elif 'wolf_seer' in icon:
+							else:
 								wolf_seer = True
+
+						elif not player['self'] and 'lovers' in icon:
+							player['couple'] = True
+
+							couples.append(4 * (i - 1) + j)
 
 					players.append(player)
 
