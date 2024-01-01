@@ -887,22 +887,13 @@ class TrackerV2(Tracker):
 				continue
 
 		for service_message in service_messages:
-			print(service_message)
-
 			player = None
 			number = None
 			name = None
 			role = None
 			dead = True
 
-			if 'шторм' in service_message:
-				self.last_message_number = 1
-
-				input(f'\n{Style.BRIGHT}{Fore.RED}There was a storm! Recheck required!')
-
-				return
-
-			elif 'убил' in service_message:
+			if 'убил' in service_message:
 				if 'дождь' in service_message:
 					player = service_message.split(' дождь на ')[1].split(' и убил его.')[0]
 
@@ -935,8 +926,6 @@ class TrackerV2(Tracker):
 						if '/' in service_message:
 							role = players[p].split(' / ')[1].split(')')[0]
 
-						print(number, name, role)
-
 						self.set_name(number, name)
 						self.PLAYERS[number]['dead'] = not p
 
@@ -954,8 +943,6 @@ class TrackerV2(Tracker):
 
 					if '/' in service_message:
 						role = players[p].split(' / ')[1].split(')')[0]
-
-					print(number, name, role)
 
 					self.set_name(number, name)
 					self.PLAYERS[number]['dead'] = not p
@@ -985,8 +972,6 @@ class TrackerV2(Tracker):
 
 			elif 'отомщена' in service_message:
 				player = service_message.split(' отомщена, ')[1].split(' погиб!')[0]
-
-				print(player)
 
 			elif 'мэр!' in service_message:
 				player = service_message.split('Игрок ')[1].split(' - ')[0]
@@ -1021,8 +1006,6 @@ class TrackerV2(Tracker):
 
 				if role is None and '/' in service_message:
 					role = player.split(' / ')[1].split(')')[0]
-
-				print(number, name, role)
 
 				self.set_name(number, name)
 				self.PLAYERS[number]['dead'] = dead
