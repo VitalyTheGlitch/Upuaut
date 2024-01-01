@@ -234,7 +234,7 @@ class Tracker:
 				if j == i:
 					continue
 
-				left_roles.extend(rotations[j])
+				left_roles += rotations[j]
 
 			for role in rotations[i]:
 				if role not in left_roles and len(role) == 1:
@@ -870,7 +870,7 @@ class TrackerV2(Tracker):
 						for (let m = last_message_number; m < messages.length; ++m) {
 							blocks = messages[m].querySelectorAll("div > span");
 
-							if (blocks.length == 3) service_messages.push(messages[m].textContent);
+							if (blocks.length >= 3) service_messages.push(messages[m].textContent);
 						}
 
 						last_message_number = messages.length;
@@ -1163,6 +1163,9 @@ class TrackerV2(Tracker):
 
 						elif 'rolechanges' in role:
 							role = 'random-other'
+
+						elif 'kittenwolf' in role:
+							role = 'kitten-wolf'
 
 						for _ in range(2):
 							if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
