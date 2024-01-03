@@ -887,6 +887,8 @@ class TrackerV2(Tracker):
 				continue
 
 		for service_message in service_messages:
+			print(service_message)
+
 			player = None
 			number = None
 			name = None
@@ -896,6 +898,28 @@ class TrackerV2(Tracker):
 			if 'убил' in service_message:
 				if 'дождь' in service_message:
 					player = service_message.split(' дождь на ')[1].split(' и убил его.')[0]
+
+				elif 'воду' in service_message:
+					if 'себя' in service_message:
+						...
+
+					else:
+						players = service_message.split(' кинул святую воду и убил ')
+
+						for p in range(2):
+							number = int(players[p].split(' ')[0]) - 1
+							name = players[p].split(' ')[1]	
+
+							if '/' in service_message:
+								role = players[p].split(' / ')[1].split(')')[0]
+
+							self.set_name(number, name)
+							self.PLAYERS[number]['dead'] = not p
+
+							if role:
+								self.set_role(number, role)
+
+					continue	
 
 				else:
 					if 'убили' in service_message:
@@ -907,14 +931,17 @@ class TrackerV2(Tracker):
 					else:
 						sep = ' убил '
 
-					player = service_message.split(sep)[1].replace('.', '')
+					player = service_message.split(sep)[1]
+
+			elif 'зарезал' in service_message:
+				player = service_message.split(' зарезал ')[1]
 
 			elif 'взрывом' in service_message:
 				player = service_message.split(' был убит взрывом!')[0]
 
 			elif 'застрелил' in service_message:
 				if 'Надзиратель' in service_message:
-					player = service_message.split(' застрелил ')[1].replace('!', '')
+					player = service_message.split(' застрелил ')[1]
 
 				else:
 					players = service_message.split(' застрелил ')
@@ -927,7 +954,7 @@ class TrackerV2(Tracker):
 							role = players[p].split(' / ')[1].split(')')[0]
 
 						self.set_name(number, name)
-						self.PLAYERS[number]['dead'] = not p
+						self.PLAYERS[number]['dead'] = p
 
 						if role:
 							self.set_role(number, role)
@@ -945,7 +972,7 @@ class TrackerV2(Tracker):
 						role = players[p].split(' / ')[1].split(')')[0]
 
 					self.set_name(number, name)
-					self.PLAYERS[number]['dead'] = not p
+					self.PLAYERS[number]['dead'] = p
 
 					if role:
 						self.set_role(number, role)
@@ -962,6 +989,9 @@ class TrackerV2(Tracker):
 				player = service_message.split(' посетил ')[0]
 				role = 'Red lady'
 
+			elif 'Силач' in service_message:
+				...
+
 			elif 'раскрыть роль' in service_message:
 				player = service_message.split(' раскрыть роль ')[1]
 				dead = False
@@ -972,6 +1002,9 @@ class TrackerV2(Tracker):
 
 			elif 'отомщена' in service_message:
 				player = service_message.split(' отомщена, ')[1].split(' погиб!')[0]
+
+			elif 'душе' in service_message:
+				player = service_message.split(' погиб ')[0]
 
 			elif 'мэр!' in service_message:
 				player = service_message.split('Игрок ')[1].split(' - ')[0]
@@ -1000,6 +1033,8 @@ class TrackerV2(Tracker):
 				dead = False
 
 			if player:
+				print(player)
+
 				if not number:
 					number = int(player.split(' ')[0]) - 1
 					name = player.split(' ')[1]
@@ -1007,11 +1042,16 @@ class TrackerV2(Tracker):
 				if role is None and '/' in service_message:
 					role = player.split(' / ')[1].split(')')[0]
 
+				print(number, name, role)
+
 				self.set_name(number, name)
 				self.PLAYERS[number]['dead'] = dead
 
 				if role:
 					self.set_role(number, role)
+
+		input()
+
 
 	def find_players(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
