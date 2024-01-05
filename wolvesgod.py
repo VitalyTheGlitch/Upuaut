@@ -776,6 +776,8 @@ class TrackerV2(Tracker):
 		self.dead_chat = None
 		self.last_message_number = 1
 
+		self.get_cards('hack3r')
+
 	def choose_rotation(self, rotations, roles):
 		flatten_rotations = []
 
@@ -896,6 +898,8 @@ class TrackerV2(Tracker):
 			dead = True
 
 			if 'убил' in service_message:
+				service_message = service_message.replace('!', '')
+
 				if 'дождь' in service_message:
 					player = service_message.split(' дождь на ')[1].split(' и убил его.')[0]
 
@@ -1025,6 +1029,9 @@ class TrackerV2(Tracker):
 				if 'любви' in service_message:
 					player = service_message.split('Игрок ')[1].split(' лишился')[0]
 
+				elif 'рекрутом' in service_message:
+					player = service_message.split('Игрок ')[1].split(' был')[0]
+
 				else:
 					player = service_message.split(' сбежал из деревни.')[0]
 
@@ -1049,7 +1056,6 @@ class TrackerV2(Tracker):
 
 				if role:
 					self.set_role(number, role)
-
 		input()
 
 
