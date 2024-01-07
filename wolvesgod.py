@@ -28,9 +28,12 @@ class Tracker:
 
 		self.ROLES = []
 		self.ADVANCED_ROLES = []
+		self.ROLE_ICONS = {}
 		self.ROTATION = []
 		self.PLAYERS = []
 		self.CARDS = {}
+		self.ICONS = {}
+
 
 		for _ in range(16):
 			self.PLAYERS.append({
@@ -66,6 +69,23 @@ class Tracker:
 
 		with open('cards.json', 'w') as cards_file:
 			json.dump(self.CARDS, cards_file)
+
+	def load_icons(self):
+		try:
+			with open('icons.json', 'r') as icons_file:
+				self.ICONS = json.load(icons_file)
+		except:
+			self.ICONS = {}
+
+	def write_icons(self, player, icons):
+		if player not in self.ICONS:
+			self.ICONS[player] = icons
+
+		else:
+			self.ICONS[player].update(icons)
+
+		with open('icons.json', 'w') as icons_file:
+			json.dump(self.ICONS, icons_file)
 
 	def get_roles(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Getting roles...')
@@ -898,7 +918,7 @@ class TrackerV2(Tracker):
 			dead = True
 
 			if 'убил' in service_message:
-				service_message = service_message.replace('!', '')
+				service_message = service_message.replace('.', '').replace('!', '')
 
 				if 'дождь' in service_message:
 					player = service_message.split(' дождь на ')[1].split(' и убил его.')[0]
@@ -1084,6 +1104,7 @@ class TrackerV2(Tracker):
 		self.ROTATION = []
 		self.PLAYERS = []
 		self.CARDS = {}
+		self.ICONS = {}
 
 		self.load_cards()
 
@@ -1204,6 +1225,8 @@ class TrackerV2(Tracker):
 
 						roles.append(role)
 
+						self.ICONS[role] = icon
+
 					print(f'{Style.BRIGHT}{Fore.GREEN}Roles found!')
 
 					rotations = self.get_rotations()
@@ -1291,13 +1314,14 @@ class Miner:
 
 		pyautogui.moveTo(100, 100)
 
-		if self.wait('vpn_on.png', check_fail=True, check_count=3, click=False):
-			self.wait('vpn_connect.png')
+		while self.wait('vpn_header.png', check_fail=True):
+			self.back()
 
-			pyautogui.moveTo(100, 100)
+		if not self.wait('vpn_connect.png', check_fail=True, check_count=3):
+			if self.wait('vpn_on.png', check_fail=True, check_count=10, click=False):
+				self.back()
 
-			while self.wait('vpn_on.png', click=False):
-				time.sleep(5)
+			self.back()
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}VPN launched!')
 
@@ -1315,9 +1339,7 @@ class Miner:
 				return 1
 
 			if self.wait('ad.png', confidence=0.8, check_fail=True):
-				print(f'{Style.BRIGHT}{Fore.RED}Loading takes too long. Pause for 5 minutes started...')
-
-				time.sleep(300)
+				print(f'{Style.BRIGHT}{Fore.RED}Loading takes too long.')
 
 				return
 
