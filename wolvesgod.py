@@ -1317,9 +1317,13 @@ class Miner:
 		while self.wait('vpn_header.png', check_fail=True):
 			self.back()
 
+			pyautogui.moveTo(100, 100)
+
 		if not self.wait('vpn_connect.png', check_fail=True, check_count=3):
 			if self.wait('vpn_on.png', check_fail=True, check_count=10, click=False):
 				self.back()
+
+				pyautogui.moveTo(100, 100)
 
 			self.back()
 
