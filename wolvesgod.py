@@ -19,21 +19,25 @@ class Tracker:
 
 		try:
 			self.API_KEY = self.config['API_KEY']
+			self.BEARER_TOKEN = self.config['BEARER_TOKEN']
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}API key not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}Tokens not found!{Back.RESET}')
 
 			os.abort()
 
-		self.BASE_URL = 'https://api.wolvesville.com/'
+		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
+		self.BEARER_BASE_URL = 'https://api-core.wolvesville.com/'
 
-		self.ROLES = []
-		self.ADVANCED_ROLES = []
 		self.ROTATION = []
 		self.PLAYERS = []
 
-		self.CARDS = {}
-		self.ICONS = {}
+		self.ROLES = []
+		self.ADVANCED_ROLES = []
+
 		self.ROTATION_ICONS = {}
+
+		self.PLAYER_CARDS = {}
+		self.ICONS = {}
 
 		for _ in range(16):
 			self.PLAYERS.append({
@@ -47,10 +51,15 @@ class Tracker:
 				'not_equal': set()
 			})
 
-		self.HEADERS = {
+		self.BOT_HEADERS = {
 			'Authorization': f'Bot {self.API_KEY}',
 			'Accept': 'application/json',
 			'Content-Type': 'application/json'
+		}
+
+		self.BEARER_HEADERS = {
+			'Authorization': f'Bearer {self.BEARER_TOKEN}',
+			'Ids': '1'
 		}
 
 		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + r'\\Google\\Chrome\\User Data\\WolvesGod'
@@ -63,43 +72,43 @@ class Tracker:
 	def load_cards(self):
 		try:
 			with open('cards.json', 'r') as cards_file:
-				self.CARDS = json.load(cards_file)
+				self.PLAYER_CARDS = json.load(cards_file)
 		except:
-			self.CARDS = {}
+			self.PLAYER_CARDS = {}
 
 	def write_cards(self, player, cards):
-		if player not in self.CARDS:
-			self.CARDS[player] = cards
+		if player not in self.PLAYER_CARDS:
+			self.PLAYER_CARDS[player] = cards
 
 		else:
-			self.CARDS[player].update(cards)
+			self.PLAYER_CARDS[player].update(cards)
 
 		with open('cards.json', 'w') as cards_file:
-			json.dump(self.CARDS, cards_file)
+			json.dump(self.PLAYER_CARDS, cards_file)
 
 	def load_icons(self):
 		try:
 			with open('icons.json', 'r') as icons_file:
-				self.ICONS = json.load(icons_file)
+				self.PLAYER_ICONS = json.load(icons_file)
 		except:
-			self.ICONS = {}
+			self.PLAYER_ICONS = {}
 
 	def write_icons(self, player, icons):
-		if player not in self.ICONS:
-			self.ICONS[player] = icons
+		if player not in self.PLAYER_ICONS:
+			self.PLAYER_ICONS[player] = icons
 
 		else:
-			self.ICONS[player].update(icons)
+			self.PLAYER_ICONS[player].update(icons)
 
 		with open('icons.json', 'w') as icons_file:
-			json.dump(self.ICONS, icons_file)
+			json.dump(self.PLAYER_ICONS, icons_file)
 
 	def get_roles(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Getting roles...')
 
 		ENDPOINT = 'roles'
 
-		data = requests.get(f'{self.BASE_URL}{ENDPOINT}', headers=self.HEADERS).json()
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS).json()
 
 		roles = {}
 
@@ -169,12 +178,29 @@ class Tracker:
 
 		return roles, advanced_roles
 
+	def get_icons(self):
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Getting icons...')
+
+		ENDPOINT = 'items/roleIcons'
+
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS).json()
+
+		icons = {}
+
+		for icon in data:
+			icons[icon['id']] = {
+				'url': icon['image']['url'],
+				'role': icon['roleId']
+			}
+
+		return icons
+
 	def get_rotations(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Getting role rotations...')
 
 		ENDPOINT = 'roleRotations'
 
-		data = requests.get(f'{self.BASE_URL}{ENDPOINT}', headers=self.HEADERS).json()
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS).json()
 
 		rotations = {}
 
@@ -218,32 +244,55 @@ class Tracker:
 
 		return rotations
 
-	def get_cards(self, username):
+	def get_player(self, username):
 		ENDPOINT = f'players/search?username={username}'
 
-		data = requests.get(f'{self.BASE_URL}{ENDPOINT}', headers=self.HEADERS)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS)
 
 		if not data.ok:
 			return
 
 		data = data.json()
 
-		cards = {c['roleId1']: c['roleId2'] for c in data['roleCards'] if 'roleId2' in c}
+		player_id = data['id']
 
-		if 'fool' in cards:
-			cards.pop('fool')
+		cards = {}
 
-		if 'headhunter' in cards:
-			cards.pop('headhunter')
+		for card in data['roleCards']:
+			if card['roleId1'] == 'harlot':
+				card['roleId1'] = 'red-lady'
 
-		if 'harlot' in cards:
-			cards['red-lady'] = cards.pop('harlot')
+			elif card['roleId1'] == 'cursed-human':
+				card['roleId1'] = 'cursed'
 
-		if 'cursed-human' in cards:
-			cards['cursed'] = cards.pop('cursed-human')
+			elif card['roleId1'] in ['fool', 'headhunter']:
+				continue
 
-		for achievement in data['gameStats']['achievements']:
-			if achievement['roleId'] in ['fool', 'headhunter']:
+			if 'roleId2' in card:
+				cards[card['roleId1']] = card['roleId2']
+
+		ENDPOINT = f'playerRoleStats/achievements/{player_id}'
+
+		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS)
+
+		if not data.ok:
+			return
+
+		data = data.json()
+
+		icons = {}
+
+		for achievement in data:
+			if achievement['roleId'] == 'harlot':
+				achievement['roleId'] = 'red-lady'
+
+			elif achievement['roleId'] == 'cursed-human':
+				achievement['roleId'] = 'cursed'
+
+			if 'roleIconId' in achievement:
+				icons[achievement['roleId']] = achievement['roleIconId']
+
+			if achievement['roleId'] in ['fool', 'headhunter', 'zombie']:
 				continue
 
 			for role in self.ROLES:
@@ -251,8 +300,8 @@ class Tracker:
 					cards[role] = achievement['roleId']
 
 					break
-
-		return cards
+		
+		return cards, icons
 
 	def choose_rotation(self, rotations):
 		gamemodes = list(rotations)
@@ -386,7 +435,7 @@ class Tracker:
 			return
 
 	def set_name(self, player, name):
-		cards = self.get_cards(name)
+		cards, icons = self.get_player(name)
 
 		if cards is None:
 			input(f'\n{Style.BRIGHT}{Back.RED}Invalid name!{Back.RESET}')
@@ -397,15 +446,16 @@ class Tracker:
 			self.PLAYERS[player]['name'] = name
 
 			self.write_cards(name, cards)
+			self.write_icons(name, icons)
 
 			role = self.PLAYERS[player]['role']
 
 			if role and role not in self.ADVANCED_ROLES:
 				for src_role in self.ADVANCED_ROLES:
 					if role in self.ADVANCED_ROLES[src_role]:
-						break
+						self.write_cards(name, {src_role: role})
 
-				self.write_cards(name, {src_role: role})
+						break
 
 	def set_role(self, player, role):
 		for r in self.ROTATION:
@@ -917,18 +967,19 @@ class Tracker:
 		print(f'{Style.BRIGHT}{Fore.GREEN}Players found!')
 
 	def prepare(self):
-		self.ROLES = []
-		self.ADVANCED_ROLES = []
 		self.ROTATION = []
 		self.PLAYERS = []
 
-		self.CARDS = {}
-		self.ICONS = {}
 		self.ROTATION_ICONS = {}
 
+		self.PLAYER_CARDS = {}
+		self.PLAYER_ICONS = {}
+
 		self.load_cards()
+		self.load_icons()
 
 		self.ROLES, self.ADVANCED_ROLES = self.get_roles()
+		self.ICONS = self.get_icons()
 
 		self.last_message_number = 1
 
@@ -993,18 +1044,31 @@ class Tracker:
 			teams_exclude = player['teams_exclude']
 			aura = player['aura']
 
-			cards = list(self.CARDS.get(name, {}).values())
+			cards = list(self.PLAYER_CARDS.get(name, {}).values())
+			icons = self.PLAYER_ICONS.get(name, {})
 
-			possible_advanced_roles = []
+			possible = set()
 
 			if not player['role']:
 				for role in self.ROTATION:
-					if role['id'] in cards and \
-						role['team'] not in teams_exclude and \
-						(not team or team == role['team']) and \
-						(not aura or aura == role['aura']) \
-						and self.ROLES[role['id']]['name'] in remaining[role['aura']]:
-						possible_advanced_roles.append(self.ROLES[role['id']]['name'])
+					if 'random' in role['id']:
+						continue
+
+					icon = icons.get(role['id'])
+
+					card_test = all([
+						role['id'] in cards,
+						role['team'] not in teams_exclude,
+						not team or team == role['team'],
+						not aura or aura == role['aura'],
+						self.ROLES[role['id']]['name'] in remaining[role['aura']],
+						icon is None or self.ROTATION_ICONS[role['id']] == self.ICONS[icon]['url']
+					])
+
+					icon_test = icon and self.ROTATION_ICONS[role['id']] == self.ICONS[icon]['url']
+
+					if card_test or icon_test:
+						possible.add(self.ROLES[role['id']]['name'])
 
 			info = f'{i + 1}'
 
@@ -1023,10 +1087,8 @@ class Tracker:
 
 				info += f' [NOT {teams_exclude}]'
 
-			if possible_advanced_roles:
-				possible_advanced_roles = ', '.join(possible_advanced_roles)
-
-				info += f' + POSSIBLE {possible_advanced_roles}'
+			if possible:
+				info += ' + POSSIBLE ' + ', '.join(possible)
 
 			info += '\n'
 
@@ -1256,7 +1318,7 @@ class Tracker:
 
 						roles.append(role)
 
-						self.ICONS[role] = icon
+						self.ROTATION_ICONS[role] = icon
 
 					print(f'{Style.BRIGHT}{Fore.GREEN}Roles found!')
 
@@ -1282,10 +1344,10 @@ class Tracker:
 						self.update_players()
 		except KeyboardInterrupt:
 			return
-		except Exception as e:
-			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
+		# except Exception as e:
+			# input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
 
-			return
+			# return
 
 
 class Miner:
@@ -1406,6 +1468,8 @@ class Miner:
 
 		self.wait('profile.png', click=False)
 		self.wait('cancel.png', check_fail=True, check_count=3)
+
+		time.sleep(1)
 		
 		while True:
 			header = pyautogui.locateCenterOnScreen('img/header.png', confidence=0.8)
