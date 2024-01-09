@@ -219,13 +219,31 @@ class Tracker:
 		if not data.ok:
 			return
 
-		cards = {c['roleId1']: c['roleId2'] for c in data.json()['roleCards'] if 'roleId2' in c}
+		data = data.json()
+
+		cards = {c['roleId1']: c['roleId2'] for c in data['roleCards'] if 'roleId2' in c}
+
+		if 'fool' in cards:
+			cards.pop('fool')
+
+		if 'headhunter' in cards:
+			cards.pop('headhunter')
 
 		if 'harlot' in cards:
 			cards['red-lady'] = cards.pop('harlot')
 
 		if 'cursed-human' in cards:
 			cards['cursed'] = cards.pop('cursed-human')
+
+		for achievement in data['gameStats']['achievements']:
+			if achievement['roleId'] in ['fool', 'headhunter']:
+				continue
+
+			for role in self.ROLES:
+				if achievement['roleId'] in self.ADVANCED_ROLES.get(role, []):
+					cards[role] = achievement['roleId']
+
+					break
 
 		return cards
 
@@ -796,8 +814,6 @@ class TrackerV2(Tracker):
 		self.dead_chat = None
 		self.last_message_number = 1
 
-		self.get_cards('hack3r')
-
 	def choose_rotation(self, rotations, roles):
 		flatten_rotations = []
 
@@ -1007,7 +1023,7 @@ class TrackerV2(Tracker):
 				player = service_message.split(' ночью. ')[1].split(' умер.')[0]
 
 			elif 'Меч' in service_message:
-				player = service_message.split(' чтобы убить')[1]
+				player = service_message.split(' чтобы убить ')[1]
 
 			elif 'Куртизанка' in service_message:
 				player = service_message.split(' посетил ')[0]
