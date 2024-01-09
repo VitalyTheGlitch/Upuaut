@@ -746,6 +746,24 @@ class Tracker:
 
 					continue	
 
+				elif 'выстрелить' in service_message:
+					players = service_message.split(', но убил')[0].split(' попытался выстрелить в  ')
+
+					for p in range(2):
+						number = int(players[p].split(' ')[0]) - 1
+						name = players[p].split(' ')[1]	
+
+						if '/' in service_message:
+							role = players[p].split(' / ')[1].split(')')[0]
+
+						self.set_name(number, name)
+						self.PLAYERS[number]['dead'] = not p
+
+						if role:
+							self.set_role(number, role)
+
+					continue
+
 				else:
 					if 'убили' in service_message:
 						sep = ' убили '
