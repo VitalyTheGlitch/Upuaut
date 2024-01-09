@@ -28,11 +28,12 @@ class Tracker:
 
 		self.ROLES = []
 		self.ADVANCED_ROLES = []
-		self.ROLE_ICONS = {}
 		self.ROTATION = []
 		self.PLAYERS = []
+
 		self.CARDS = {}
 		self.ICONS = {}
+		self.ROTATION_ICONS = {}
 
 		for _ in range(16):
 			self.PLAYERS.append({
@@ -902,8 +903,10 @@ class Tracker:
 		self.ADVANCED_ROLES = []
 		self.ROTATION = []
 		self.PLAYERS = []
+
 		self.CARDS = {}
 		self.ICONS = {}
+		self.ROTATION_ICONS = {}
 
 		self.load_cards()
 
@@ -1115,6 +1118,8 @@ class Tracker:
 					'not_equal': set()
 				})
 
+			self.find_players()
+
 		else:
 			try:
 				player, info = cmd.lower().split(' is ')
@@ -1259,10 +1264,10 @@ class Tracker:
 						self.update_players()
 		except KeyboardInterrupt:
 			return
-		# except Exception as e:
-		# 	input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
+		except Exception as e:
+			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
 
-		# 	return
+			return
 
 
 class Miner:
