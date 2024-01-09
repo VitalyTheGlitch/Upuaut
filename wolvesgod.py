@@ -34,7 +34,6 @@ class Tracker:
 		self.CARDS = {}
 		self.ICONS = {}
 
-
 		for _ in range(16):
 			self.PLAYERS.append({
 				'name': None,
@@ -52,6 +51,13 @@ class Tracker:
 			'Accept': 'application/json',
 			'Content-Type': 'application/json'
 		}
+
+		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + r'\\Google\\Chrome\\User Data\\WolvesGod'
+		self.user_agent = UserAgent(verify_ssl=False)
+		self.page = None
+		self.day_chat = None
+		self.dead_chat = None
+		self.last_message_number = 1
 
 	def load_cards(self):
 		try:
@@ -592,228 +598,6 @@ class Tracker:
 			if self.set_role(player, info):
 				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect role or aura!{Back.RESET}')
 
-	def monitor(self):
-		banner(self.__class__.__name__)
-
-		players_info = ''
-
-		remaining = {
-			'GOOD': [],
-			'EVIL': [],
-			'UNKNOWN': []
-		}
-
-		distinct_rotation = []
-
-		for role in self.ROTATION:
-			if role not in distinct_rotation:
-				distinct_rotation.append(role)
-
-		for role in distinct_rotation:
-			total = self.ROTATION.count(role)
-			found = 0
-
-			for player in self.PLAYERS:
-				if player['role'] == role['id']:
-					found += 1
-
-					if found == total:
-						break
-
-			for _ in range(total - found):
-				remaining[role['aura']].append(role['name'])
-
-		remaining_good = ', '.join(remaining['GOOD'])
-		remaining_evil = ', '.join(remaining['EVIL'])
-		remaining_unknown = ', '.join(remaining['UNKNOWN'])
-
-		remaining_info = f'\n{Style.BRIGHT}{Back.RED}REMAINING{Back.RESET}' + \
-					f'\n{Fore.GREEN}GOOD:{Fore.RESET} {remaining_good}' + \
-					f'\n{Fore.RED}EVIL:{Fore.RESET} {remaining_evil}' + \
-					f'\n{Fore.CYAN}UNKNOWN:{Fore.RESET} {remaining_unknown}'
-
-		for i, player in enumerate(self.PLAYERS):
-			name = player['name']
-			team = player['team']
-			teams_exclude = player['teams_exclude']
-			aura = player['aura']
-
-			cards = list(self.CARDS.get(name, {}).values())
-
-			possible_advanced_roles = []
-
-			if not player['role']:
-				for role in self.ROTATION:
-					if role['id'] in cards and \
-						role['team'] not in teams_exclude and \
-						(not team or team == role['team']) and \
-						(not aura or aura == role['aura']) \
-						and self.ROLES[role['id']]['name'] in remaining[role['aura']]:
-						possible_advanced_roles.append(self.ROLES[role['id']]['name'])
-
-			info = f'{i + 1}'
-
-			if name:
-				info += f' ({name})'
-
-			if player['role']:
-				role = self.ROLES[player['role']]['name']
-				info += f' - {role}'
-
-			elif team:
-				info += f' [{team}]'
-
-			elif teams_exclude:
-				teams_exclude = ', '.join(teams_exclude)
-
-				info += f' [NOT {teams_exclude}]'
-
-			if possible_advanced_roles:
-				possible_advanced_roles = ', '.join(possible_advanced_roles)
-
-				info += f' + POSSIBLE {possible_advanced_roles}'
-
-			info += '\n'
-
-			if player['aura'] == 'GOOD':
-				info = f'{Back.GREEN}{info}{Back.RESET}'
-
-			elif player['aura'] == 'EVIL':
-				info = f'{Back.RED}{info}{Back.RESET}'
-
-			elif player['aura'] == 'UNKNOWN':
-				info = f'{Back.CYAN}{info}{Back.RESET}'
-
-			if player['dead']:
-				info = f'\t{Style.DIM}{info}'
-
-			else:
-				info = f'{Style.BRIGHT}{info}'
-
-			players_info += info
-
-		print(f'{Style.BRIGHT}{players_info}{remaining_info}')
-
-	def process(self):
-		cmd = input(f'\n{Style.BRIGHT}{Fore.RED}>{Fore.RESET} ')
-
-		if not cmd:
-			return
-
-		elif cmd.lower() == 'end':
-			return 1
-
-		elif cmd.lower().startswith('clear '):
-			info = cmd.lower().split('clear ')[1].split(' ')
-
-			if len(info) >= 1 and info[0].isdigit() and 1 <= int(info[0]) <= 16:
-				if len(info) == 1:
-					info.append('all')
-
-				player = int(info[0]) - 1
-				info = info[1]
-
-				self.clear_player_info(player, info)
-
-			else:
-				input(f'\n{Style.BRIGHT}{Back.RED}Invalid info!{Back.RESET}')
-
-		elif cmd.lower().startswith('name of '):
-			cmd = cmd.split(' ')
-
-			if len(cmd) == 5 and cmd[3].lower() == 'is' and cmd[2].isdigit() and 1 <= int(cmd[2]) <= 16:
-				player = int(cmd[2]) - 1
-				name = cmd[4]
-
-				self.set_name(player, name)
-
-			else:
-				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect number!{Back.RESET}')
-
-		elif cmd.lower().startswith('there is '):
-			query = cmd.lower().split('there is ')[1]
-
-			self.set_advanced_role(query)
-
-		elif cmd.lower() == 'cursed turned':
-			self.set_cursed()
-
-		elif '=' in cmd:
-			if not(cmd.count('!=') == 1 or cmd.count('=') == 1):
-				input(f'\n{Style.BRIGHT}{Back.RED}Invalid syntax!{Back.RESET}')
-
-				return
-
-			equal = '!=' if '!=' in cmd else '='
-
-			players = cmd.split(f' {equal} ')
-
-			if len(players) == 2 and players[0].isdigit() and players[1].isdigit():
-				players = list(map(int, players))
-
-				if not (1 <= players[0] <= 16 and 1 <= players[1] <= 16):
-					input(f'\n{Style.BRIGHT}{Back.RED}Invalid number(s)!{Back.RESET}')
-
-					return
-
-				players[0] -= 1
-				players[1] -= 1
-
-				self.set_equal(players, equal == '=')
-
-			else:
-				input(f'\n{Style.BRIGHT}{Back.RED}Invalid syntax!{Back.RESET}')
-
-		else:
-			try:
-				player, info = cmd.lower().split(' is ')
-			except ValueError:
-				print(f'\n{Style.BRIGHT}{Fore.RED}Usage:')
-				print(f'{Style.BRIGHT}{Fore.RED}[number] is [role / aura / dead / alive]')
-				print(f'{Style.BRIGHT}{Fore.RED}[number] [= / !=] [number]')
-				print(f'{Style.BRIGHT}{Fore.RED}Name of [number] is [name]')
-				print(f'{Style.BRIGHT}{Fore.RED}There is [advanced role]')
-				print(f'{Style.BRIGHT}{Fore.RED}Cursed turned')
-				print(f'{Style.BRIGHT}{Fore.RED}Clear [number] [all / name / team / aura / equal]')
-				print(f'{Style.BRIGHT}{Fore.RED}end - stop tracker')
-				input()
-
-				return
-
-			self.set_player_info(player, info)
-
-	def run(self):
-		banner(self.__class__.__name__)
-
-		self.load_cards()
-
-		self.ROLES, self.ADVANCED_ROLES = self.get_roles()
-
-		rotations = self.get_rotations()
-
-		self.ROTATION = self.choose_rotation(rotations)
-
-		try:
-			while True:
-				self.monitor()
-
-				if self.process():
-					return
-		except KeyboardInterrupt:
-			return
-
-
-class TrackerV2(Tracker):
-	def __init__(self):
-		super().__init__()
-		
-		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + r'\\Google\\Chrome\\User Data\\WolvesGod'
-		self.user_agent = UserAgent(verify_ssl=False)
-		self.page = None
-		self.day_chat = None
-		self.dead_chat = None
-		self.last_message_number = 1
-
 	def choose_rotation(self, rotations, roles):
 		flatten_rotations = []
 
@@ -1094,7 +878,6 @@ class TrackerV2(Tracker):
 					self.set_role(number, role)
 		input()
 
-
 	def find_players(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
 
@@ -1142,6 +925,215 @@ class TrackerV2(Tracker):
 
 		self.day_chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div/div/div[1]/div/div/div/div')
 		self.dead_chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div/div[2]/div/div/div[1]/div/div/div')
+
+	def monitor(self):
+		banner(self.__class__.__name__)
+
+		players_info = ''
+
+		remaining = {
+			'GOOD': [],
+			'EVIL': [],
+			'UNKNOWN': []
+		}
+
+		distinct_rotation = []
+
+		for role in self.ROTATION:
+			if role not in distinct_rotation:
+				distinct_rotation.append(role)
+
+		for role in distinct_rotation:
+			total = self.ROTATION.count(role)
+			found = 0
+
+			for player in self.PLAYERS:
+				if player['role'] == role['id']:
+					found += 1
+
+					if found == total:
+						break
+
+			for _ in range(total - found):
+				remaining[role['aura']].append(role['name'])
+
+		remaining_good = ', '.join(remaining['GOOD'])
+		remaining_evil = ', '.join(remaining['EVIL'])
+		remaining_unknown = ', '.join(remaining['UNKNOWN'])
+
+		remaining_info = f'\n{Style.BRIGHT}{Back.RED}REMAINING{Back.RESET}' + \
+					f'\n{Fore.GREEN}GOOD:{Fore.RESET} {remaining_good}' + \
+					f'\n{Fore.RED}EVIL:{Fore.RESET} {remaining_evil}' + \
+					f'\n{Fore.CYAN}UNKNOWN:{Fore.RESET} {remaining_unknown}'
+
+		for i, player in enumerate(self.PLAYERS):
+			name = player['name']
+			team = player['team']
+			teams_exclude = player['teams_exclude']
+			aura = player['aura']
+
+			cards = list(self.CARDS.get(name, {}).values())
+
+			possible_advanced_roles = []
+
+			if not player['role']:
+				for role in self.ROTATION:
+					if role['id'] in cards and \
+						role['team'] not in teams_exclude and \
+						(not team or team == role['team']) and \
+						(not aura or aura == role['aura']) \
+						and self.ROLES[role['id']]['name'] in remaining[role['aura']]:
+						possible_advanced_roles.append(self.ROLES[role['id']]['name'])
+
+			info = f'{i + 1}'
+
+			if name:
+				info += f' ({name})'
+
+			if player['role']:
+				role = self.ROLES[player['role']]['name']
+				info += f' - {role}'
+
+			elif team:
+				info += f' [{team}]'
+
+			elif teams_exclude:
+				teams_exclude = ', '.join(teams_exclude)
+
+				info += f' [NOT {teams_exclude}]'
+
+			if possible_advanced_roles:
+				possible_advanced_roles = ', '.join(possible_advanced_roles)
+
+				info += f' + POSSIBLE {possible_advanced_roles}'
+
+			info += '\n'
+
+			if player['aura'] == 'GOOD':
+				info = f'{Back.GREEN}{info}{Back.RESET}'
+
+			elif player['aura'] == 'EVIL':
+				info = f'{Back.RED}{info}{Back.RESET}'
+
+			elif player['aura'] == 'UNKNOWN':
+				info = f'{Back.CYAN}{info}{Back.RESET}'
+
+			if player['dead']:
+				info = f'\t{Style.DIM}{info}'
+
+			else:
+				info = f'{Style.BRIGHT}{info}'
+
+			players_info += info
+
+		print(f'{Style.BRIGHT}{players_info}{remaining_info}')
+
+	def process(self):
+		cmd = input(f'\n{Style.BRIGHT}{Fore.RED}>{Fore.RESET} ')
+
+		if not cmd:
+			return
+
+		elif cmd.lower() == 'end':
+			return 1
+
+		elif '=' in cmd:
+			if not(cmd.count('!=') == 1 or cmd.count('=') == 1):
+				input(f'\n{Style.BRIGHT}{Back.RED}Invalid syntax!{Back.RESET}')
+
+				return
+
+			equal = '!=' if '!=' in cmd else '='
+
+			players = cmd.split(f' {equal} ')
+
+			if len(players) == 2 and players[0].isdigit() and players[1].isdigit():
+				players = list(map(int, players))
+
+				if not (1 <= players[0] <= 16 and 1 <= players[1] <= 16):
+					input(f'\n{Style.BRIGHT}{Back.RED}Invalid number(s)!{Back.RESET}')
+
+					return
+
+				players[0] -= 1
+				players[1] -= 1
+
+				self.set_equal(players, equal == '=')
+
+			else:
+				input(f'\n{Style.BRIGHT}{Back.RED}Invalid syntax!{Back.RESET}')
+
+		elif cmd.lower().startswith('name of '):
+			cmd = cmd.split(' ')
+
+			if len(cmd) == 5 and cmd[3].lower() == 'is' and cmd[2].isdigit() and 1 <= int(cmd[2]) <= 16:
+				player = int(cmd[2]) - 1
+				name = cmd[4]
+
+				self.set_name(player, name)
+
+			else:
+				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect number!{Back.RESET}')
+
+		elif cmd.lower().startswith('there is '):
+			query = cmd.lower().split('there is ')[1]
+
+			self.set_advanced_role(query)
+
+		elif cmd.lower() == 'cursed turned':
+			self.set_cursed()
+
+		elif cmd.lower().startswith('clear '):
+			info = cmd.lower().split('clear ')[1].split(' ')
+
+			if len(info) >= 1 and info[0].isdigit() and 1 <= int(info[0]) <= 16:
+				if len(info) == 1:
+					info.append('all')
+
+				player = int(info[0]) - 1
+				info = info[1]
+
+				self.clear_player_info(player, info)
+
+			else:
+				input(f'\n{Style.BRIGHT}{Back.RED}Invalid info!{Back.RESET}')
+
+		elif cmd.lower() == 'storm':
+			self.PLAYERS = []
+
+			self.last_message_number = 1
+
+			for _ in range(16):
+				self.PLAYERS.append({
+					'name': None,
+					'role': None,
+					'team': None,
+					'teams_exclude': set(),
+					'aura': None,
+					'dead': False,
+					'equal': set(),
+					'not_equal': set()
+				})
+
+		else:
+			try:
+				player, info = cmd.lower().split(' is ')
+			except ValueError:
+				print(f'\n{Style.BRIGHT}{Fore.RED}Usage:')
+				print(f'{Style.BRIGHT}{Fore.RED}[number] is [role / aura / dead / alive]')
+				print(f'{Style.BRIGHT}{Fore.RED}[number] [= / !=] [number]')
+				print(f'{Style.BRIGHT}{Fore.RED}Name of [number] is [name]')
+				print(f'{Style.BRIGHT}{Fore.RED}There is [advanced role]')
+				print(f'{Style.BRIGHT}{Fore.RED}Cursed turned')
+				print(f'{Style.BRIGHT}{Fore.RED}Clear [number] [all / name / team / aura / equal]')
+				print(f'{Style.BRIGHT}{Fore.RED}Storm to rediscover')
+				print(f'{Style.BRIGHT}{Fore.RED}Enter to update')
+				print(f'{Style.BRIGHT}{Fore.RED}end - stop tracker')
+				input()
+
+				return
+
+			self.set_player_info(player, info)
 
 	def run(self):
 		banner(self.__class__.__name__)
@@ -1802,7 +1794,7 @@ def run():
 	while True:
 		banner()
 
-		modules = [Tracker(), TrackerV2(), Miner(), Grinder()]
+		modules = [Tracker(), Miner(), Grinder()]
 		module = None
 
 		for i, module in enumerate(modules):
