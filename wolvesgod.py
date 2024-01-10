@@ -19,11 +19,12 @@ class Tracker:
 
 		try:
 			self.API_KEY = self.config['API_KEY']
-			self.BEARER_TOKEN = self.config['BEARER_TOKEN']
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}Tokens not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}API token not found!{Back.RESET}')
 
 			os.abort()
+
+		self.BEARER_TOKEN = None
 
 		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
 		self.BEARER_BASE_URL = 'https://api-core.wolvesville.com/'
@@ -57,10 +58,7 @@ class Tracker:
 			'Content-Type': 'application/json'
 		}
 
-		self.BEARER_HEADERS = {
-			'Authorization': f'Bearer {self.BEARER_TOKEN}',
-			'Ids': '1'
-		}
+		self.BEARER_HEADERS = None
 
 		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + r'\\Google\\Chrome\\User Data\\WolvesGod'
 		self.user_agent = UserAgent(verify_ssl=False)
@@ -108,7 +106,12 @@ class Tracker:
 
 		ENDPOINT = 'roles'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS).json()
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS)
+
+		if not data.ok:
+			return None, None
+
+		data = data.json()
 
 		roles = {}
 
@@ -183,13 +186,18 @@ class Tracker:
 
 		ENDPOINT = 'items/roleIcons'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS).json()
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS)
+
+		if not data.ok:
+			return
+
+		data = data.json()
 
 		icons = {}
 
 		for icon in data:
 			icons[icon['id']] = {
-				'url': icon['image']['url'],
+				'filename': icon['image']['url'].split('roleIcons/')[1],
 				'role': icon['roleId']
 			}
 
@@ -250,7 +258,7 @@ class Tracker:
 		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS)
 
 		if not data.ok:
-			return
+			return None, None
 
 		data = data.json()
 
@@ -276,7 +284,7 @@ class Tracker:
 		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS)
 
 		if not data.ok:
-			return
+			return None, None
 
 		data = data.json()
 
@@ -300,7 +308,7 @@ class Tracker:
 					cards[role] = achievement['roleId']
 
 					break
-		
+
 		return cards, icons
 
 	def choose_rotation(self, rotations):
@@ -404,7 +412,10 @@ class Tracker:
 
 	def clear_player_info(self, player, info):
 		if info == 'all':
+			hero = self.PLAYERS[player]['hero']
+
 			self.PLAYERS[player] = {
+				'hero': hero,
 				'name': None,
 				'role': None,
 				'team': None,
@@ -445,6 +456,9 @@ class Tracker:
 		else:
 			self.PLAYERS[player]['name'] = name
 
+			if self.PLAYERS[player]['hero']:
+				return
+
 			self.write_cards(name, cards)
 			self.write_icons(name, icons)
 
@@ -472,12 +486,18 @@ class Tracker:
 				for not_equal_player in self.PLAYERS[player]['not_equal']:
 					self.PLAYERS[not_equal_player]['teams_exclude'].add(self.PLAYERS[player]['team'])
 
+				if self.PLAYERS[player]['hero']:
+					break
+
 				if name and r['id'] not in self.ADVANCED_ROLES:
 					for src_role in self.ADVANCED_ROLES:
 						if r['id'] in self.ADVANCED_ROLES[src_role]:
 							break
 
 					self.write_cards(name, {src_role: r['id']})
+
+				if r['id'] in self.ROTATION_ICONS:
+					self.write_icons(name, {r['id']: self.ROTATION_ICONS[r['id']]})
 
 				break
 
@@ -567,7 +587,7 @@ class Tracker:
 				for not_equal_player in self.PLAYERS[p]['not_equal']:
 					self.PLAYERS[not_equal_player]['teams_exclude'].add(self.PLAYERS[p]['team'])
 
-				if player['name'] and src_role in self.ADVANCED_ROLES:
+				if not player['hero'] and player['name'] and src_role in self.ADVANCED_ROLES:
 					self.write_cards(player['name'], {
 						src_role: dst_role
 					})
@@ -724,6 +744,14 @@ class Tracker:
 
 		return rotation
 
+	def get_bearer(self): 
+		self.BEARER_TOKEN = self.page.evaluate('() => JSON.parse(localStorage.getItem("authtokens"))["idToken"]')
+
+		self.BEARER_HEADERS = {
+			'Authorization': f'Bearer {self.BEARER_TOKEN}',
+			'Ids': '1'
+		}
+
 	def update_players(self): 
 		service_messages = []
 
@@ -760,8 +788,6 @@ class Tracker:
 				continue
 
 		for service_message in service_messages:
-			print(service_message)
-
 			player = None
 			number = None
 			name = None
@@ -797,7 +823,7 @@ class Tracker:
 					continue	
 
 				elif 'выстрелить' in service_message:
-					players = service_message.split(', но убил')[0].split(' попытался выстрелить в  ')
+					players = service_message.split(', но убил')[0].split(' попытался выстрелить в ')
 
 					for p in range(2):
 						number = int(players[p].split(' ')[0]) - 1
@@ -873,7 +899,11 @@ class Tracker:
 				continue
 
 			elif 'казнил' in service_message:
-				player = service_message.split(' ночью. ')[1].split(' умер.')[0]
+				if 'Тюремщик' in service_message:
+					player = service_message.split(' ночью. ')[1].split(' умер.')[0]
+
+				else:
+					player = service_message.split(' казнил ')[1]
 
 			elif 'Меч' in service_message:
 				player = service_message.split(' чтобы убить ')[1]
@@ -898,6 +928,9 @@ class Tracker:
 
 			elif 'душе' in service_message:
 				player = service_message.split(' погиб ')[0]
+
+			elif 'связал' in service_message:
+				player = service_message.split('Роль ')[0].split(' была')[0]
 
 			elif 'мэр!' in service_message:
 				player = service_message.split('Игрок ')[1].split(' - ')[0]
@@ -926,11 +959,16 @@ class Tracker:
 
 			elif 'героически' in service_message:
 				player = service_message.split(' героически занял место ')[0].split('Игрок ')[1]
+				number = int(player.split(' ')[0]) - 1
+				name = player.split(' ')[1]
 				dead = False
 
-			if player:
-				print(player)
+				self.PLAYERS[number]['hero'] = True
+				self.set_name(number, name)
 
+				continue
+
+			if player:
 				if not number:
 					number = int(player.split(' ')[0]) - 1
 					name = player.split(' ')[1]
@@ -938,14 +976,11 @@ class Tracker:
 				if role is None and '/' in service_message:
 					role = player.split(' / ')[1].split(')')[0]
 
-				print(number, name, role)
-
 				self.set_name(number, name)
 				self.PLAYERS[number]['dead'] = dead
 
 				if role:
 					self.set_role(number, role)
-		input()
 
 	def find_players(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
@@ -960,13 +995,14 @@ class Tracker:
 					name = name_locator.text_content(timeout=1000).split(' ')[1]
 
 					self.set_name(4 * (i - 1) + j - 1, name)
-
 				except PlaywrightTimeoutError:
 					continue
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Players found!')
 
 	def prepare(self):
+		self.get_bearer()
+
 		self.ROTATION = []
 		self.PLAYERS = []
 
@@ -981,10 +1017,14 @@ class Tracker:
 		self.ROLES, self.ADVANCED_ROLES = self.get_roles()
 		self.ICONS = self.get_icons()
 
+		if not any([self.ROLES, self.ADVANCED_ROLES, self.ICONS]):
+			return 1
+
 		self.last_message_number = 1
 
 		for _ in range(16):
 			self.PLAYERS.append({
+				'hero': False,
 				'name': None,
 				'role': None,
 				'team': None,
@@ -1054,20 +1094,24 @@ class Tracker:
 					if 'random' in role['id']:
 						continue
 
-					icon = icons.get(role['id'])
+					player_icon = icons.get(role['id'])
+					role_icon = self.ROTATION_ICONS.get(role['id'])
 
-					card_test = all([
-						role['id'] in cards,
+					base_test = all([
 						role['team'] not in teams_exclude,
 						not team or team == role['team'],
 						not aura or aura == role['aura'],
-						self.ROLES[role['id']]['name'] in remaining[role['aura']],
-						icon is None or self.ROTATION_ICONS[role['id']] == self.ICONS[icon]['url']
+						self.ROLES[role['id']]['name'] in remaining[role['aura']]
 					])
 
-					icon_test = icon and self.ROTATION_ICONS[role['id']] == self.ICONS[icon]['url']
+					card_test = all([
+						role['id'] in cards,
+						player_icon is None or player_icon == role_icon
+					])
 
-					if card_test or icon_test:
+					icon_test = player_icon and player_icon == role_icon
+
+					if base_test and (card_test or icon_test):
 						possible.add(self.ROLES[role['id']]['name'])
 
 			info = f'{i + 1}'
@@ -1163,6 +1207,15 @@ class Tracker:
 
 			self.set_advanced_role(query)
 
+		elif cmd.lower().startswith('change '):
+			query = cmd.lower().split('change ')[1].split(' to ')
+
+			if len(query) == 2:
+				self.change_role(query)
+
+			else:
+				input(f'\n{Style.BRIGHT}{Back.RED}Invalid syntax!{Back.RESET}')
+
 		elif cmd.lower() == 'cursed turned':
 			self.set_cursed()
 
@@ -1256,7 +1309,10 @@ class Tracker:
 				while True:
 					banner(self.__class__.__name__)
 
-					self.prepare()
+					if self.prepare():
+						input(f'\n{Style.BRIGHT}{Back.RED}Invalid API key!{Back.RESET}')
+
+						return
 
 					print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for game start...')
 
@@ -1277,7 +1333,7 @@ class Tracker:
 
 					roles_base_locator = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[2]/div')
 
-					icons = roles_base_locator.evaluate('''
+					rotation_icons = roles_base_locator.evaluate('''
 						(locator) => {
 							let sources = [];
 
@@ -1293,32 +1349,56 @@ class Tracker:
 
 					roles = []
 
-					for icon in icons:
-						role = icon.split('icon_')[1].split('_filled')[0]
-						role = role.replace('.svg', '').replace('.png', '')
-						role = role.replace('_', '-')
+					for rotation_icon in rotation_icons:
+						if 'roleIcons' in rotation_icon and 'random' not in rotation_icon:
+							rotation_icon = rotation_icon.split('roleIcons/')[1]
 
-						if 'cursed' in role:
-							role = 'cursed'
+							for icon in self.ICONS:
+								if self.ICONS[icon]['filename'] == rotation_icon:
+									role = self.ICONS[icon]['role']
 
-						elif 'harlot' in role:
-							role = 'red-lady'
+									if role == 'cursed-human':
+										role = 'cursed'
 
-						elif 'rolechanges' in role:
-							role = 'random-other'
+									elif role == 'harlot':
+										role = 'red-lady'
 
-						elif 'kittenwolf' in role:
-							role = 'kitten-wolf'
+									roles.append(role)
 
-						for _ in range(2):
-							if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
-								break
+									self.ROTATION_ICONS[role] = icon
 
-							role = role[role.find('-') + 1:]
+									break
 
-						roles.append(role)
+						else:
+							role = rotation_icon.split('icon_')[1].split('_filled')[0]
+							role = role.replace('.svg', '').replace('.png', '')
+							role = role.replace('_', '-')
 
-						self.ROTATION_ICONS[role] = icon
+							if 'cursed' in role:
+								role = 'cursed'
+
+							elif 'harlot' in role:
+								role = 'red-lady'
+
+							elif 'flowedchild' in role:
+								role = 'flower-child'
+
+							elif 'rolechanges' in role:
+								role = 'random-other'
+
+							elif 'kittenwolf' in role:
+								role = 'kitten-wolf'
+
+							elif 'nightmare' in role:
+								role = 'nightmare-werewolf'
+
+							for _ in range(2):
+								if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
+									break
+
+								role = role[role.find('-') + 1:]
+
+							roles.append(role)
 
 					print(f'{Style.BRIGHT}{Fore.GREEN}Roles found!')
 
