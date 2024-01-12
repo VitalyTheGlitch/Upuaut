@@ -259,7 +259,7 @@ class Tracker:
 		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS)
 
 		if not data.ok:
-			return None, None
+			return data.status_code, data.text
 
 		data = data.json()
 
@@ -285,9 +285,7 @@ class Tracker:
 		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS)
 
 		if not data.ok:
-			print(data.text)
-
-			return None, None
+			return data.status_code, data.text
 
 		data = data.json()
 
@@ -312,7 +310,7 @@ class Tracker:
 
 					break
 
-		return cards, icons
+		return 0, cards, icons
 
 	def choose_rotation(self, rotations):
 		gamemodes = list(rotations)
@@ -451,30 +449,36 @@ class Tracker:
 			return
 
 	def set_name(self, player, name):
-		cards, icons = self.get_player(name)
+		data = self.get_player(name)
 
-		if cards is None:
+		if data[0] == 404:
 			input(f'\n{Style.BRIGHT}{Back.RED}Invalid name!{Back.RESET}')
 
 			return
 
-		else:
-			self.PLAYERS[player]['name'] = name
+		elif data[0]:
+			input(f'\n{Style.BRIGHT}{Back.RED}Error {data[0]}: {data[1]}{Back.RESET}')
 
-			if self.PLAYERS[player]['hero']:
-				return
+			return
 
-			self.write_cards(name, cards)
-			self.write_icons(name, icons)
+		cards, icons = data[1:]
 
-			role = self.PLAYERS[player]['role']
+		self.PLAYERS[player]['name'] = name
 
-			if role and role not in self.ADVANCED_ROLES:
-				for src_role in self.ADVANCED_ROLES:
-					if role in self.ADVANCED_ROLES[src_role]:
-						self.write_cards(name, {src_role: role})
+		if self.PLAYERS[player]['hero']:
+			return
 
-						break
+		self.write_cards(name, cards)
+		self.write_icons(name, icons)
+
+		role = self.PLAYERS[player]['role']
+
+		if role and role not in self.ADVANCED_ROLES:
+			for src_role in self.ADVANCED_ROLES:
+				if role in self.ADVANCED_ROLES[src_role]:
+					self.write_cards(name, {src_role: role})
+
+					break
 
 	def set_role(self, player, role):
 		for r in self.ROTATION:
@@ -768,12 +772,11 @@ class Tracker:
 
 				result = chat.evaluate('''
 					(chat, last_message_number) => {
-						let service_messages = [];
-						let user_messages = [];
+						let service_messages = [],
+						player_messages = [],
+						messages = chat.querySelectorAll("div [dir=auto]");
 
-						let messages = chat.querySelectorAll("div [dir=auto]");
-
-						if (messages.length < last_message_number) return null;
+						if (messages.length < last_message_number) return;
 
 						for (let m = last_message_number; m < messages.length; ++m) {
 							blocks = messages[m].querySelectorAll("div > span");
@@ -1000,7 +1003,7 @@ class Tracker:
 
 			number = int(player.split(' ')[0]) - 1
 			name = player.split(' ')[1]
-
+		input()
 	def find_players(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
 
@@ -1055,7 +1058,7 @@ class Tracker:
 				'messages': []
 			})
 
-		self.day_chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div/div/div[1]/div/div/div/div')
+		self.day_chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div/div/div[1]/div/div/div').first
 		self.dead_chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div/div[2]/div/div/div[1]/div/div/div')
 
 	def monitor(self):
@@ -1313,7 +1316,8 @@ class Tracker:
 					executable_path=self.EXECUTABLE_PATH,
 					headless=False,
 					args=['--window-position=-7,40', '--mute-audio'],
-					ignore_default_args=['--enable-automation']
+					ignore_default_args=['--enable-automation'],
+					chromium_sandbox=True
 				)
 
 				self.page = context.pages[0]
@@ -1752,7 +1756,8 @@ class Grinder:
 					executable_path=self.EXECUTABLE_PATH,
 					headless=False,
 					args=['--window-position=-7,40', '--mute-audio'],
-					ignore_default_args=['--enable-automation']
+					ignore_default_args=['--enable-automation'],
+					chromium_sandbox=True
 				)
 
 				self.page = context.pages[0]
