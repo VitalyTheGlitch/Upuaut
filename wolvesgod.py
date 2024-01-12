@@ -60,7 +60,8 @@ class Tracker:
 
 		self.BEARER_HEADERS = None
 
-		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + r'\\Google\\Chrome\\User Data\\WolvesGod'
+		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\WolvesGod'
+		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 		self.user_agent = UserAgent(verify_ssl=False)
 		self.page = None
 		self.day_chat = None
@@ -284,6 +285,8 @@ class Tracker:
 		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS)
 
 		if not data.ok:
+			print(data.text)
+
 			return None, None
 
 		data = data.json()
@@ -413,9 +416,9 @@ class Tracker:
 	def clear_player_info(self, player, info):
 		if info == 'all':
 			hero = self.PLAYERS[player]['hero']
+			messages = self.PLAYERS[player]['messages']
 
 			self.PLAYERS[player] = {
-				'hero': hero,
 				'name': None,
 				'role': None,
 				'team': None,
@@ -423,7 +426,9 @@ class Tracker:
 				'aura': None,
 				'dead': False,
 				'equal': set(),
-				'not_equal': set()
+				'not_equal': set(),
+				'hero': hero,
+				'messages': messages
 			}
 
 		elif info == 'name':
@@ -587,7 +592,7 @@ class Tracker:
 				for not_equal_player in self.PLAYERS[p]['not_equal']:
 					self.PLAYERS[not_equal_player]['teams_exclude'].add(self.PLAYERS[p]['team'])
 
-				if not player['hero'] and player['name'] and src_role in self.ADVANCED_ROLES:
+				if player['name'] and not player['hero'] and src_role in self.ADVANCED_ROLES:
 					self.write_cards(player['name'], {
 						src_role: dst_role
 					})
@@ -752,8 +757,9 @@ class Tracker:
 			'Ids': '1'
 		}
 
-	def update_players(self): 
+	def update_players(self):
 		service_messages = []
+		player_messages = []
 
 		for chat in (self.day_chat, self.dead_chat):
 			try:
@@ -763,6 +769,7 @@ class Tracker:
 				result = chat.evaluate('''
 					(chat, last_message_number) => {
 						let service_messages = [];
+						let user_messages = [];
 
 						let messages = chat.querySelectorAll("div [dir=auto]");
 
@@ -772,16 +779,17 @@ class Tracker:
 							blocks = messages[m].querySelectorAll("div > span");
 
 							if (blocks.length >= 3) service_messages.push(messages[m].textContent);
+							else player_messages.push(messages[m].textContent);
 						}
 
 						last_message_number = messages.length;
 
-						return [service_messages, last_message_number];
+						return [service_messages, player_messages, last_message_number];
 					}
 				''', self.last_message_number)
 
 				if result is not None:
-					service_messages, self.last_message_number = result
+					service_messages, player_messages, self.last_message_number = result
 
 					break
 			except:
@@ -982,6 +990,17 @@ class Tracker:
 				if role:
 					self.set_role(number, role)
 
+		for player_message in player_messages:
+			player_message = player_message.split(': ', 1)
+
+			if len(player_message) != 2:
+				continue
+
+			player, message = player_message
+
+			number = int(player.split(' ')[0]) - 1
+			name = player.split(' ')[1]
+
 	def find_players(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
 
@@ -1024,7 +1043,6 @@ class Tracker:
 
 		for _ in range(16):
 			self.PLAYERS.append({
-				'hero': False,
 				'name': None,
 				'role': None,
 				'team': None,
@@ -1032,7 +1050,9 @@ class Tracker:
 				'aura': None,
 				'dead': False,
 				'equal': set(),
-				'not_equal': set()
+				'not_equal': set(),
+				'hero': False,
+				'messages': []
 			})
 
 		self.day_chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div/div/div[1]/div/div/div/div')
@@ -1235,11 +1255,12 @@ class Tracker:
 				input(f'\n{Style.BRIGHT}{Back.RED}Invalid info!{Back.RESET}')
 
 		elif cmd.lower() == 'storm':
-			self.PLAYERS = []
-
 			self.last_message_number = 1
 
-			for _ in range(16):
+			for p in range(16):
+				hero = self.PLAYERS[p]['hero']
+				messages = self.PLAYERS[p]['messages']
+
 				self.PLAYERS.append({
 					'name': None,
 					'role': None,
@@ -1248,7 +1269,9 @@ class Tracker:
 					'aura': None,
 					'dead': False,
 					'equal': set(),
-					'not_equal': set()
+					'not_equal': set(),
+					'hero': hero,
+					'messages': messages
 				})
 
 			self.find_players()
@@ -1287,6 +1310,7 @@ class Tracker:
 						'width': 960,
 						'height': 972
 					},
+					executable_path=self.EXECUTABLE_PATH,
 					headless=False,
 					args=['--window-position=-7,40', '--mute-audio'],
 					ignore_default_args=['--enable-automation']
@@ -1430,169 +1454,10 @@ class Tracker:
 			# return
 
 
-class Miner:
-	@staticmethod
-	def wait(path, confidence=0.9, check_fail=False, check_count=7, click=True):
-		fails = 0
-
-		while True:
-			coords = pyautogui.locateCenterOnScreen('img/' + path, confidence=confidence)
-
-			if coords:
-				if click:
-					try:
-						pyautogui.click(*coords)
-					except pyautogui.FailSafeException:
-						continue
-
-				return 0
-
-			if check_fail:
-				fails += 1
-
-			if fails == check_count:
-				return 1
-
-			time.sleep(5)
-
-	@staticmethod
-	def launch_emulator():
-		pyautogui.press('win')
-
-		time.sleep(3)
-
-		pyautogui.write('memu', interval=0.2)
-		pyautogui.press('enter')
-
-	def shutdown(self, reboot=False):
-		self.wait('close.png')
-
-		if reboot:
-			self.wait('reboot.png')
-
-		else:
-			self.wait('ok.png')
-
-	def back(self):
-		self.wait('back.png')
-
-	def home(self):
-		self.wait('home.png')
-
-	def launch_vpn(self):
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Launching VPN...')
-
-		while self.wait('vpn_app_icon.png', check_fail=True):
-			self.home()
-
-		pyautogui.moveTo(100, 100)
-
-		while self.wait('vpn_header.png', check_fail=True):
-			self.back()
-
-			pyautogui.moveTo(100, 100)
-
-		if not self.wait('vpn_connect.png', check_fail=True, check_count=3):
-			if self.wait('vpn_on.png', check_fail=True, check_count=10, click=False):
-				self.back()
-
-				pyautogui.moveTo(100, 100)
-
-			self.back()
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}VPN launched!')
-
-	def spin(self):
-		while True:
-			print(f'{Style.BRIGHT}{Fore.GREEN}Spinning...')
-
-			pyautogui.moveTo(100, 100)
-
-			if not self.wait('done.png', confidence=0.8, check_fail=True, check_count=1):
-				print(f'{Style.BRIGHT}{Fore.GREEN}DONE!')
-
-				playsound('audio/confusion.mp3')
-
-				return 1
-
-			if self.wait('ad.png', confidence=0.8, check_fail=True):
-				print(f'{Style.BRIGHT}{Fore.RED}Loading takes too long.')
-
-				return
-
-			time.sleep(35)
-
-			self.back()
-
-			if self.wait('spin.png', confidence=0.8, check_fail=True):
-				print(f'{Style.BRIGHT}{Fore.RED}Spin button not found.')
-
-				return
-
-	def prepare(self):
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for MEmu...')
-
-		self.home()
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}MEmu found!')
-
-		time.sleep(3)
-
-		self.launch_vpn()
-		self.home()
-
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Launching game...')
-
-		while self.wait('game_app_icon.png', check_fail=True):
-			self.home()
-
-		self.wait('profile.png', click=False)
-		self.wait('cancel.png', check_fail=True, check_count=3)
-
-		time.sleep(1)
-		
-		while True:
-			header = pyautogui.locateCenterOnScreen('img/header.png', confidence=0.8)
-
-			if header:
-				break
-
-		pyautogui.click(header[0], header[1] + 35)
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}Game launched!')
-
-	def run(self):
-		banner(self.__class__.__name__)
-
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Launching MEmu...')
-
-		self.launch_emulator()
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}MEmu launched!')
-
-		try:
-			while True:
-				self.prepare()
-
-				if self.spin():
-					self.shutdown()
-
-					input(f'\n{Style.BRIGHT}{Fore.GREEN}Press Enter to continue{Fore.RESET}')
-
-					return
-
-				print(f'{Style.BRIGHT}{Fore.YELLOW}Rebooting...')
-
-				self.shutdown(reboot=True)
-		except KeyboardInterrupt:
-			self.shutdown()
-
-			return
-
-
 class Grinder:
 	def __init__(self):
-		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + r'\\Google\\Chrome\\User Data\\WolvesGod'
+		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\WolvesGod'
+		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 		self.user_agent = UserAgent(verify_ssl=False)
 		self.page = None
 
@@ -1884,6 +1749,7 @@ class Grinder:
 						'width': 960,
 						'height': 972
 					},
+					executable_path=self.EXECUTABLE_PATH,
 					headless=False,
 					args=['--window-position=-7,40', '--mute-audio'],
 					ignore_default_args=['--enable-automation']
@@ -1944,6 +1810,150 @@ class Grinder:
 			return
 
 
+class Miner:
+	@staticmethod
+	def wait(filename, confidence=0.9, check_fail=False, check_count=7, click=True):
+		fails = 0
+
+		while True:
+			coords = pyautogui.locateCenterOnScreen('img/' + filename, confidence=confidence)
+
+			if coords:
+				if click:
+					try:
+						pyautogui.click(*coords)
+					except pyautogui.FailSafeException:
+						continue
+
+				return 0
+
+			if check_fail:
+				fails += 1
+
+			if fails == check_count:
+				return 1
+
+			time.sleep(5)
+
+	@staticmethod
+	def launch_emulator():
+		pyautogui.press('win')
+
+		time.sleep(1)
+
+		pyautogui.write('bluestacks 5', interval=0.2)
+		pyautogui.press('enter')
+
+	@staticmethod
+	def wheel():
+		time.sleep(1)
+
+		while True:
+			header = pyautogui.locateCenterOnScreen('img/header.png', confidence=0.8)
+
+			if header:
+				break
+
+		pyautogui.click(header[0], header[1] + 35)
+
+	def shutdown(self):
+		self.wait('shutdown.png')
+		self.wait('confirm.png')
+
+	def back(self):
+		self.wait('back.png')
+
+	def home(self):
+		self.wait('home.png')
+
+	def close_all(self):
+		self.wait('recent.png')
+		self.wait('clear.png')
+
+	def spin(self):
+		while True:
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking ad button...')
+
+			pyautogui.moveTo(100, 100)
+
+			if not self.wait('done.png', confidence=0.8, check_fail=True, check_count=2):
+				print(f'{Style.BRIGHT}{Fore.GREEN}DONE!')
+
+				playsound('audio/confusion.mp3')
+
+				return 1
+
+			if self.wait('ad.png', confidence=0.8, check_fail=True):
+				print(f'{Style.BRIGHT}{Fore.RED}Loading takes too long.')
+
+				return
+
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Watching ad...')
+
+			time.sleep(35)
+
+			self.back()
+
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking spin button...')
+
+			if self.wait('spin.png', confidence=0.8, check_fail=True):
+				print(f'{Style.BRIGHT}{Fore.RED}Spin button not found.')
+
+				self.back()
+				self.wheel()
+
+			else:
+				print(f'{Style.BRIGHT}{Fore.GREEN}Spinned!')
+
+	def prepare(self):
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for BlueStacks 5...')
+
+		self.home()
+
+		print(f'{Style.BRIGHT}{Fore.GREEN}BlueStacks 5 found!')
+
+		time.sleep(3)
+
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for game load...')
+
+		while self.wait('game_app_icon.png', check_fail=True):
+			self.home()
+
+		self.wait('profile.png', click=False)
+		self.wait('cancel.png', check_fail=True, check_count=3)
+		self.wheel()
+
+		print(f'{Style.BRIGHT}{Fore.GREEN}Game loaded!')
+
+	def run(self):
+		banner(self.__class__.__name__)
+
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Launching BlueStacks 5...')
+
+		self.launch_emulator()
+
+		print(f'{Style.BRIGHT}{Fore.GREEN}BlueStacks 5 launched!')
+
+		try:
+			while True:
+				self.prepare()
+
+				if self.spin():
+					self.shutdown()
+
+					input(f'\n{Style.BRIGHT}{Fore.YELOOW}Press Enter to exit.{Fore.RESET}')
+
+					return
+
+				print(f'{Style.BRIGHT}{Fore.YELLOW}Restarting...')
+
+				self.close_all()
+		except KeyboardInterrupt:
+			self.shutdown()
+
+			return
+
+
 def banner(module=None):
 	os.system('cls')
 
@@ -1961,7 +1971,7 @@ def run():
 	while True:
 		banner()
 
-		modules = [Tracker(), Miner(), Grinder()]
+		modules = [Tracker(), Grinder(), Miner()]
 		module = None
 
 		for i, module in enumerate(modules):
