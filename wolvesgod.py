@@ -66,7 +66,7 @@ class Tracker:
 		self.page = None
 		self.day_chat = None
 		self.dead_chat = None
-		self.last_message_number = 1
+		self.last_message_number = 0
 
 	def load_cards(self):
 		try:
@@ -454,12 +454,12 @@ class Tracker:
 		if data[0] == 404:
 			input(f'\n{Style.BRIGHT}{Back.RED}Invalid name!{Back.RESET}')
 
-			return
+			return 404
 
 		elif data[0]:
 			input(f'\n{Style.BRIGHT}{Back.RED}Error {data[0]}: {data[1]}{Back.RESET}')
 
-			return
+			return data[0]
 
 		cards, icons = data[1:]
 
@@ -674,6 +674,15 @@ class Tracker:
 		elif info.lower() in ['good', 'evil', 'unknown']:
 			self.PLAYERS[player]['aura'] = info.upper()
 
+		elif info.lower() in ['villager', 'werewolf', 'solo']:
+			self.PLAYERS[player]['aura'] = info.upper()
+
+		elif info.lower().startswith('not'):
+			info = info.lower().replace('not ', '', 1)
+
+			if info in ['villager', 'werewolf', 'solo']:
+				...
+
 		else:
 			if self.set_role(player, info):
 				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect role or aura!{Back.RESET}')
@@ -799,6 +808,8 @@ class Tracker:
 				continue
 
 		for service_message in service_messages:
+			print(service_message)
+
 			player = None
 			number = None
 			name = None
@@ -806,8 +817,6 @@ class Tracker:
 			dead = True
 
 			if 'убил' in service_message:
-				service_message = service_message.replace('.', '').replace('!', '')
-
 				if 'дождь' in service_message:
 					player = service_message.split(' дождь на ')[1].split(' и убил его.')[0]
 
@@ -826,7 +835,7 @@ class Tracker:
 								role = players[p].split(' / ')[1].split(')')[0]
 
 							self.set_name(number, name)
-							self.PLAYERS[number]['dead'] = not p
+							self.PLAYERS[number]['dead'] = p
 
 							if role:
 								self.set_role(number, role)
@@ -980,12 +989,17 @@ class Tracker:
 				continue
 
 			if player:
+				player = player.replace('.', '').replace('!', '')
+
 				if not number:
 					number = int(player.split(' ')[0]) - 1
 					name = player.split(' ')[1]
 
 				if role is None and '/' in service_message:
 					role = player.split(' / ')[1].split(')')[0]
+
+				print(player)
+				print(number, name, role)
 
 				self.set_name(number, name)
 				self.PLAYERS[number]['dead'] = dead
@@ -1001,9 +1015,16 @@ class Tracker:
 
 			player, message = player_message
 
+			if ' ' not in player:
+				continue
+
 			number = int(player.split(' ')[0]) - 1
 			name = player.split(' ')[1]
+
+			self.PLAYERS[number]['messages'].append(message)
+
 		input()
+
 	def find_players(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
 
@@ -1023,8 +1044,6 @@ class Tracker:
 		print(f'{Style.BRIGHT}{Fore.GREEN}Players found!')
 
 	def prepare(self):
-		self.get_bearer()
-
 		self.ROTATION = []
 		self.PLAYERS = []
 
@@ -1042,7 +1061,7 @@ class Tracker:
 		if not any([self.ROLES, self.ADVANCED_ROLES, self.ICONS]):
 			return 1
 
-		self.last_message_number = 1
+		self.last_message_number = 0
 
 		for _ in range(16):
 			self.PLAYERS.append({
@@ -1106,6 +1125,7 @@ class Tracker:
 			team = player['team']
 			teams_exclude = player['teams_exclude']
 			aura = player['aura']
+			messages = player['messages']
 
 			cards = list(self.PLAYER_CARDS.get(name, {}).values())
 			icons = self.PLAYER_ICONS.get(name, {})
@@ -1140,7 +1160,9 @@ class Tracker:
 			info = f'{i + 1}'
 
 			if name:
-				info += f' ({name})'
+				info += f' {name}'
+
+			info += f' ({len(messages)})'
 
 			if player['role']:
 				role = self.ROLES[player['role']]['name']
@@ -1258,7 +1280,7 @@ class Tracker:
 				input(f'\n{Style.BRIGHT}{Back.RED}Invalid info!{Back.RESET}')
 
 		elif cmd.lower() == 'storm':
-			self.last_message_number = 1
+			self.last_message_number = 0
 
 			for p in range(16):
 				hero = self.PLAYERS[p]['hero']
@@ -1284,7 +1306,7 @@ class Tracker:
 				player, info = cmd.lower().split(' is ')
 			except ValueError:
 				print(f'\n{Style.BRIGHT}{Fore.RED}Usage:')
-				print(f'{Style.BRIGHT}{Fore.RED}[number] is [role / aura / dead / alive]')
+				print(f'{Style.BRIGHT}{Fore.RED}[number] is [role / aura / (not) team / dead / alive]')
 				print(f'{Style.BRIGHT}{Fore.RED}[number] [= / !=] [number]')
 				print(f'{Style.BRIGHT}{Fore.RED}Name of [number] is [name]')
 				print(f'{Style.BRIGHT}{Fore.RED}There is [advanced role]')
@@ -1331,6 +1353,9 @@ class Tracker:
 						print(f'{Style.BRIGHT}{Fore.RED}Timeout error!{Fore.RESET}')
 
 						continue
+
+				if not self.BEARER_TOKEN:
+					self.get_bearer()
 
 				print(f'{Style.BRIGHT}{Fore.GREEN}Website opened!')
 
@@ -1946,7 +1971,7 @@ class Miner:
 				if self.spin():
 					self.shutdown()
 
-					input(f'\n{Style.BRIGHT}{Fore.YELOOW}Press Enter to exit.{Fore.RESET}')
+					input(f'\n{Style.BRIGHT}{Fore.YELLOW}Press Enter to exit.{Fore.RESET}')
 
 					return
 
