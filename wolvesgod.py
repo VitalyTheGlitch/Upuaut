@@ -24,6 +24,21 @@ class Tracker:
 
 			os.abort()
 
+		self.ASSET_PATHS = {
+			'see': {
+				'html': 'main.html',
+				'css': 'main.css'
+			},
+			'messages': {
+				'html': 'main.html',
+				'css': 'main.css',
+				'js': 'main.js'
+			}
+		}
+		self.ASSETS = {}
+
+		self.load_assets()
+
 		self.BEARER_TOKEN = None
 
 		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
@@ -57,16 +72,115 @@ class Tracker:
 			'Accept': 'application/json',
 			'Content-Type': 'application/json'
 		}
-
-		self.BEARER_HEADERS = None
+		self.BEARER_HEADERS = {}
 
 		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\WolvesGod'
 		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+
 		self.user_agent = UserAgent(verify_ssl=False)
 		self.page = None
 		self.day_chat = None
 		self.dead_chat = None
 		self.last_message_number = 0
+
+	def load_assets(self):
+		try:
+			for asset in self.ASSET_PATHS:
+				self.ASSETS[asset] = {}
+
+				for module in self.ASSET_PATHS[asset]:
+					filename = self.ASSET_PATHS[asset][module]
+
+					path = f'assets/{asset}/{filename}'
+
+					with open(path, 'r') as asset_file:
+						self.ASSETS[asset][module] = asset_file.read()
+		except FileNotFoundError:
+			input(f'{Style.BRIGHT}{Back.RED}{path} not found!{Back.RESET}')
+
+			os.abort()
+
+	def load_css(self):
+		see_css = self.ASSETS['see']['css']
+		messages_css = self.ASSETS['messages']['css']
+
+		self.page.evaluate('''
+			([see_css, messages_css]) => {
+				const head = document.querySelector("head");
+
+				if (!head.querySelector(".see")) {
+					style = document.createElement("style");
+					style.type = "text/css";
+					style.innerHTML = see_css;
+
+					head.appendChild(style);
+				}
+
+				if (!head.querySelector(".modal-dialog")) {
+					style = document.createElement("style");
+					style.type = "text/css";
+					style.innerHTML = messages_css;
+
+					head.appendChild(style);
+				}
+			}
+		''', [see_css, messages_css])
+
+	def load_modal(self):
+		messages_html = self.ASSETS['messages']['html']
+		messages_js = self.ASSETS['messages']['js']
+
+		field = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[1]/div[1]/div[2]/div[2]/div/div[1]')
+		field.evaluate('''
+			(field, [messages_html, messages_js]) => {
+				if (!window.messages) {
+					const html = document.createElement("div");
+					html.className = "modal-content messages";
+					html.innerHTML = messages_html;
+
+					field.appendChild(html);
+
+					const js = document.createElement("script");
+					js.innerHTML = messages_js;
+
+					document.body.appendChild(js);
+				}
+			}
+		''', [messages_html, messages_js])
+
+	def load_see(self, number, layer):
+		see_html = self.ASSETS['see']['html'].format(number)
+
+		layer.evaluate('''
+			(layer, [number, see_html]) => {
+				const html = document.createElement("div");
+				html.id = "player_" + number;
+				html.className = "see";
+				html.innerHTML = see_html;
+				html.addEventListener("click", (e) => {
+					player = e.currentTarget.id;
+
+					if (typeof player != "string" || !player.includes("player_")) return;
+
+					player = player.split("player_")[1];
+
+					if (isNaN(player)) return;
+
+					player = parseInt(player);
+
+					if (player < 0 || player > 15) return;
+
+					const name = window.players[player]["name"];
+					const messages = window.players[player]["messages"];
+
+					window.messages.setHeader(player + 1 + ' ' + name);
+					window.messages.setBody(messages.join("<br>"));
+					window.messages.open();
+				});
+
+				layer.appendChild(html);
+			}
+		''', [number, see_html])
 
 	def load_cards(self):
 		try:
@@ -762,7 +876,7 @@ class Tracker:
 
 		return rotation
 
-	def get_bearer(self): 
+	def get_bearer(self):
 		self.BEARER_TOKEN = self.page.evaluate('() => JSON.parse(localStorage.getItem("authtokens"))["idToken"]')
 
 		self.BEARER_HEADERS = {
@@ -1008,6 +1122,9 @@ class Tracker:
 					self.set_role(number, role)
 
 		for player_message in player_messages:
+			if 'Приватное' in player_message:
+				continue
+
 			player_message = player_message.split(': ', 1)
 
 			if len(player_message) != 2:
@@ -1023,25 +1140,117 @@ class Tracker:
 
 			self.PLAYERS[number]['messages'].append(message)
 
-		input()
+		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
 
 	def find_players(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
+
+		layers = []
 
 		for i in range(1, 5):
 			for j in range(1, 5):
 				try:
 					time.sleep(0.5)
 
+					number = 4 * (i - 1) + j - 1
+
+					player_layer_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
 					player_base_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
 					name_locator = player_base_locator.locator('xpath=/div[1]/div/div[4]/div/div')
 					name = name_locator.text_content(timeout=1000).split(' ')[1]
 
-					self.set_name(4 * (i - 1) + j - 1, name)
+					self.set_name(number, name)
+
+					layers.append({
+						'number': number,
+						'locator': player_layer_locator
+					})
 				except PlaywrightTimeoutError:
 					continue
 
+		for layer in layers:
+			self.load_see(layer['number'], layer['locator'])
+
+		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
+
 		print(f'{Style.BRIGHT}{Fore.GREEN}Players found!')
+
+
+	def find_roles(self):
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding roles...')
+
+		roles_base_locator = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[2]/div')
+
+		rotation_icons = roles_base_locator.evaluate('''
+			(locator) => {
+				let sources = [];
+
+				const icons_1 = locator.childNodes[0].getElementsByTagName("img"),
+				icons_2 = locator.childNodes[1].getElementsByTagName("img");
+
+				for (icon of icons_1) sources.push(icon.src);
+				for (icon of icons_2) sources.push(icon.src);
+
+				return sources;
+			}
+		''')
+
+		roles = []
+
+		for rotation_icon in rotation_icons:
+			if 'roleIcons' in rotation_icon and 'random' not in rotation_icon:
+				rotation_icon = rotation_icon.split('roleIcons/')[1]
+
+				for icon in self.ICONS:
+					if self.ICONS[icon]['filename'] == rotation_icon:
+						role = self.ICONS[icon]['role']
+
+						if role == 'cursed-human':
+							role = 'cursed'
+
+						elif role == 'harlot':
+							role = 'red-lady'
+
+						roles.append(role)
+
+						self.ROTATION_ICONS[role] = icon
+
+						break
+
+			else:
+				role = rotation_icon.split('icon_')[1].split('_filled')[0]
+				role = role.replace('.svg', '').replace('.png', '')
+				role = role.replace('_', '-')
+
+				if 'cursed' in role:
+					role = 'cursed'
+
+				elif 'harlot' in role:
+					role = 'red-lady'
+
+				elif 'flowedchild' in role:
+					role = 'flower-child'
+
+				elif 'rolechanges' in role:
+					role = 'random-other'
+
+				elif 'kittenwolf' in role:
+					role = 'kitten-wolf'
+
+				elif 'nightmare' in role:
+					role = 'nightmare-werewolf'
+
+				for _ in range(2):
+					if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
+						break
+
+					role = role[role.find('-') + 1:]
+
+				roles.append(role)
+
+		print(f'{Style.BRIGHT}{Fore.GREEN}Roles found!')
+
+		return roles
 
 	def prepare(self):
 		self.ROTATION = []
@@ -1354,9 +1563,6 @@ class Tracker:
 
 						continue
 
-				if not self.BEARER_TOKEN:
-					self.get_bearer()
-
 				print(f'{Style.BRIGHT}{Fore.GREEN}Website opened!')
 
 				while True:
@@ -1380,81 +1586,12 @@ class Tracker:
 
 					print(f'{Style.BRIGHT}{Fore.GREEN}Game found!')
 
+					self.get_bearer()
+					self.load_css()
+					self.load_modal()
 					self.find_players()
 
-					print(f'{Style.BRIGHT}{Fore.YELLOW}Finding roles...')
-
-					roles_base_locator = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[2]/div')
-
-					rotation_icons = roles_base_locator.evaluate('''
-						(locator) => {
-							let sources = [];
-
-							const icons_1 = locator.childNodes[0].getElementsByTagName("img"),
-							icons_2 = locator.childNodes[1].getElementsByTagName("img");
-
-							for (icon of icons_1) sources.push(icon.src);
-							for (icon of icons_2) sources.push(icon.src);
-
-							return sources;
-						}
-					''')
-
-					roles = []
-
-					for rotation_icon in rotation_icons:
-						if 'roleIcons' in rotation_icon and 'random' not in rotation_icon:
-							rotation_icon = rotation_icon.split('roleIcons/')[1]
-
-							for icon in self.ICONS:
-								if self.ICONS[icon]['filename'] == rotation_icon:
-									role = self.ICONS[icon]['role']
-
-									if role == 'cursed-human':
-										role = 'cursed'
-
-									elif role == 'harlot':
-										role = 'red-lady'
-
-									roles.append(role)
-
-									self.ROTATION_ICONS[role] = icon
-
-									break
-
-						else:
-							role = rotation_icon.split('icon_')[1].split('_filled')[0]
-							role = role.replace('.svg', '').replace('.png', '')
-							role = role.replace('_', '-')
-
-							if 'cursed' in role:
-								role = 'cursed'
-
-							elif 'harlot' in role:
-								role = 'red-lady'
-
-							elif 'flowedchild' in role:
-								role = 'flower-child'
-
-							elif 'rolechanges' in role:
-								role = 'random-other'
-
-							elif 'kittenwolf' in role:
-								role = 'kitten-wolf'
-
-							elif 'nightmare' in role:
-								role = 'nightmare-werewolf'
-
-							for _ in range(2):
-								if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
-									break
-
-								role = role[role.find('-') + 1:]
-
-							roles.append(role)
-
-					print(f'{Style.BRIGHT}{Fore.GREEN}Roles found!')
-
+					roles = self.find_roles()
 					rotations = self.get_rotations()
 
 					print(f'{Style.BRIGHT}{Fore.YELLOW}Finding rotation...')
@@ -1469,6 +1606,8 @@ class Tracker:
 					print(f'{Style.BRIGHT}{Fore.GREEN}Rotation found!')
 
 					while True:
+						self.load_css()
+						self.load_modal()
 						self.monitor()
 
 						if self.process():
@@ -1875,7 +2014,7 @@ class Miner:
 		pyautogui.press('enter')
 
 	@staticmethod
-	def wheel():
+	def open_wheel():
 		time.sleep(1)
 
 		while True:
@@ -1929,8 +2068,7 @@ class Miner:
 			if self.wait('spin.png', confidence=0.8, check_fail=True):
 				print(f'{Style.BRIGHT}{Fore.RED}Spin button not found.')
 
-				self.back()
-				self.wheel()
+				return
 
 			else:
 				print(f'{Style.BRIGHT}{Fore.GREEN}Spinned!')
@@ -1951,7 +2089,7 @@ class Miner:
 
 		self.wait('profile.png', click=False)
 		self.wait('cancel.png', check_fail=True, check_count=3)
-		self.wheel()
+		self.open_wheel()
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Game loaded!')
 

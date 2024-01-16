@@ -1,0 +1,59 @@
+.modal-dialog {
+    position: absolute;
+    min-width: 100%;
+    min-height: 100%;
+}
+
+.modal-content {
+    position: absolute;
+    top: 35%;
+    left: 47.5%;
+    width: 500px;
+    height: auto;
+    z-index: 2;
+    background-color: #36393a;
+    color: #fff;
+    border: 1px solid #cecece;
+    font-size: 16px;
+    margin-left: -225px;
+    will-change: transform;
+    transform: scaleX(0);
+    transition: all 300ms cubic-bezier(0.72, 0.91, 0.35, 1.2);
+}
+
+.modal-content .modal-header {
+    min-height: 40px;
+    border-bottom: 1px solid #cecece;
+    padding: 20px 0px 0px 15px;
+}
+
+.modal-content .modal-header .close-modal {
+    position: absolute;
+    top: -10px;
+    right: 0;
+    font-size: 1.5em;
+    cursor: pointer;
+    user-select: none;
+    padding: 10px;
+    transition: all 500ms;
+}
+
+.modal-content .modal-header .close-modal:hover {
+    transform: rotate(180deg);
+}
+
+.modal-content .modal-body {
+    overflow: auto;
+    height: 200px;
+    padding: 15px;
+}
+
+.opened {
+    opacity: 1 !important;
+    transform: scaleX(1) !important;
+}
+
+.closed {
+    opacity: 0 !important;
+    transform: scaleX(0) !important;
+}

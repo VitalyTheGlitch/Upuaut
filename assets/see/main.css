@@ -1,0 +1,71 @@
+.see {
+    display: inline-block;
+    position: absolute;
+    top: 9%;
+    left: 11%;
+    width: 32px;
+    height: 32px;
+    z-index: 1;
+    border-radius: 50%;
+    cursor: pointer;
+    transform: translate(-50%, -50%);
+    transition: background 0.2s ease;
+    transition-delay: 0.15s;
+}
+
+.see:hover .circle circle {
+    stroke-dasharray: 95;
+    stroke-dashoffset: 0;
+}
+
+.see:hover .circle_container {
+    width: 75%;
+    height: 75%;
+    transition: all 0.4s cubic-bezier(0.51, 0.92, 0.24, 1.15);
+}
+
+.see .toggle:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.see .circle {
+    transform: rotate(-90deg);
+}
+
+.see .circle circle {
+    fill: none;
+    stroke: #36393a;
+    stroke-width: 2;
+    stroke-dasharray: 95;
+    stroke-dashoffset: 95;
+    stroke-linecap: round;
+    transition: all 0.6s ease;
+}
+
+.see .circle_container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+    transition: all 0.25s cubic-bezier(0.51, 0.92, 0.24, 1.15);
+    transition-delay: 0.4s;
+}
+
+.see .circle_container circle {
+    fill: #36393a;
+    stroke: rgba(255, 255, 255, 0.2);
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.see .icon {
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+}
