@@ -274,6 +274,18 @@ class Tracker:
 
 		roles['red-lady'] = roles.pop('harlot')
 
+		roles['rainmaker'] = {
+			'team': 'VILLAGER',
+			'aura': 'GOOD',
+			'name': 'Rainmaker'
+		}
+
+		roles['swamp-wolf'] = {
+			'team': 'WEREWOLF',
+			'aura': 'EVIL',
+			'name': 'Swamp wolf'
+		}
+
 		roles['random-other'] = roles.pop('random-others')
 
 		roles['random-werewolf-weak'] = {
@@ -1495,7 +1507,7 @@ class Tracker:
 				hero = self.PLAYERS[p]['hero']
 				messages = self.PLAYERS[p]['messages']
 
-				self.PLAYERS.append({
+				self.PLAYERS[p] = {
 					'name': None,
 					'role': None,
 					'team': None,
@@ -1506,7 +1518,7 @@ class Tracker:
 					'not_equal': set(),
 					'hero': hero,
 					'messages': messages
-				})
+				}
 
 			self.find_players()
 
@@ -1581,6 +1593,8 @@ class Tracker:
 
 							if night_chat.text_content(timeout=1000) == 'Дневной чат':
 								break
+						except KeyboardInterrupt:
+							return
 						except:
 							continue
 
