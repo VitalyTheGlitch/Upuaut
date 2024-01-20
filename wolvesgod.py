@@ -639,92 +639,49 @@ class Tracker:
 		else:
 			return 1
 
-	def set_advanced_role(self, query):
-		src_role = None
-		dst_role = None
+	def change_role(self, src_role, dst_role):
+		is_random = False
 
 		for role in self.ROLES:
-			if self.ROLES[role]['name'].lower() == query:
-				dst_role = role
+			if self.ROLES[role]['name'].lower() == dst_role.lower():
+				dst_role = self.ROLES[role]
+				dst_role['id'] = role
 
 				break
 
-		if not dst_role:
-			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect role!{Back.RESET}')
-
-			return
-
-		if dst_role in self.ADVANCED_ROLES:
-			src_role = self.ADVANCED_ROLES[dst_role]
-
 		else:
-			for role in self.ADVANCED_ROLES:
-				found = False
-
-				for advanced_role in self.ADVANCED_ROLES[role]:
-					if advanced_role == dst_role:
-						src_role = role
-						found = True
-
-						break
-
-				if found:
-					break
-
-		if not src_role:
-			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect role!{Back.RESET}')
+			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect dst role!{Back.RESET}')
 
 			return
-
-		if isinstance(src_role, list):
-			for role in self.ROTATION:
-				if role['id'] not in src_role:
-					continue
-
-				found = False
-
-				for advanced_role in self.ADVANCED_ROLES[dst_role]:
-					if advanced_role == role['id']:
-						src_role = role['id']
-						found = True
-
-						break
-
-				if found:
-					break
-
-			else:
-				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect role!{Back.RESET}')
-
-				return
 
 		for r, role in enumerate(self.ROTATION):
-			if role['id'] == src_role:
-				self.ROTATION[r] = self.ROLES[dst_role]
-				self.ROTATION[r]['id'] = dst_role
+			if role['name'].lower() == src_role.lower():
+				src_role = role['id']
+
+				if 'random' in src_role:
+					is_random = True
 
 				break
 
 		else:
-			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect role!{Back.RESET}')
+			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect src role!{Back.RESET}')
 
 			return
+
+		input()
+
+		self.ROTATION[r] = dst_role
+		self.ROTATION[r]['id'] = dst_role['id']
 
 		for p, player in enumerate(self.PLAYERS):
 			if self.PLAYERS[p]['role'] == src_role:
-				self.PLAYERS[p]['role'] = dst_role
-				self.PLAYERS[p]['team'] = self.ROLES[src_role]['team']
-				self.PLAYERS[p]['aura'] = self.ROLES[src_role]['aura']
+				self.PLAYERS[p]['role'] = dst_role['id']
+				self.PLAYERS[p]['team'] = dst_role['team']
+				self.PLAYERS[p]['aura'] = dst_role['aura']
 
-				for equal_player in self.PLAYERS[p]['equal']:
-					self.PLAYERS[equal_player]['team'] = self.PLAYERS[p]['team']
-
-				for not_equal_player in self.PLAYERS[p]['not_equal']:
-					self.PLAYERS[not_equal_player]['teams_exclude'].add(self.PLAYERS[p]['team'])
-
-				if player['name'] and not player['hero'] and src_role in self.ADVANCED_ROLES:
+				if player['name'] and not player['hero'] and not is_random and dst_role['id'] not in self.ADVANCED_ROLES:
 					self.write_cards(player['name'], {
-						src_role: dst_role
+						src_role: dst_role['id']
 					})
 
 				break
@@ -1134,7 +1091,7 @@ class Tracker:
 					self.set_role(number, role)
 
 		for player_message in player_messages:
-			if 'Приватное' in player_message:
+			if 'Приватное' in player_message or 'Сбежавший' in player_message:
 				continue
 
 			player_message = player_message.split(': ', 1)
@@ -1468,16 +1425,13 @@ class Tracker:
 			else:
 				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect number!{Back.RESET}')
 
-		elif cmd.lower().startswith('there is '):
-			query = cmd.lower().split('there is ')[1]
-
-			self.set_advanced_role(query)
-
 		elif cmd.lower().startswith('change '):
 			query = cmd.lower().split('change ')[1].split(' to ')
 
 			if len(query) == 2:
-				self.change_role(query)
+				src_role, dst_role = query
+
+				self.change_role(src_role, dst_role)
 
 			else:
 				input(f'\n{Style.BRIGHT}{Back.RED}Invalid syntax!{Back.RESET}')
@@ -1530,7 +1484,7 @@ class Tracker:
 				print(f'{Style.BRIGHT}{Fore.RED}[number] is [role / aura / (not) team / dead / alive]')
 				print(f'{Style.BRIGHT}{Fore.RED}[number] [= / !=] [number]')
 				print(f'{Style.BRIGHT}{Fore.RED}Name of [number] is [name]')
-				print(f'{Style.BRIGHT}{Fore.RED}There is [advanced role]')
+				print(f'{Style.BRIGHT}{Fore.RED}Change [role] to [role]')
 				print(f'{Style.BRIGHT}{Fore.RED}Cursed turned')
 				print(f'{Style.BRIGHT}{Fore.RED}Clear [number] [all / name / team / aura / equal]')
 				print(f'{Style.BRIGHT}{Fore.RED}Storm to rediscover')
