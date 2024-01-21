@@ -29,6 +29,9 @@ class Tracker:
 				'html': 'main.html',
 				'css': 'main.css'
 			},
+			'see2': {
+				'html': 'main.html'
+			},
 			'messages': {
 				'html': 'main.html',
 				'css': 'main.css',
@@ -150,19 +153,16 @@ class Tracker:
 
 	def load_see(self, number, layer):
 		see_html = self.ASSETS['see']['html'].format(number)
+		see2_html = self.ASSETS['see2']['html'].format(number)
 
 		layer.evaluate('''
-			(layer, [number, see_html]) => {
+			(layer, [number, see_html, see2_html]) => {
 				const html = document.createElement("div");
-				html.id = "player_" + number;
+				html.setAttribute("player", number);
 				html.className = "see";
 				html.innerHTML = see_html;
 				html.addEventListener("click", (e) => {
-					player = e.currentTarget.id;
-
-					if (typeof player != "string" || !player.includes("player_")) return;
-
-					player = player.split("player_")[1];
+					let player = e.currentTarget.getAttribute("player");
 
 					if (isNaN(player)) return;
 
@@ -179,8 +179,32 @@ class Tracker:
 				});
 
 				layer.appendChild(html);
+
+				const html2 = document.createElement("div");
+				html2.setAttribute("player", number);
+				html2.className = "see";
+				html2.style.top = "25%";
+				html2.innerHTML = see2_html;
+				html2.addEventListener("click", (e) => {
+					let player = e.currentTarget.getAttribute("player");
+
+					if (isNaN(player)) return;
+
+					player = parseInt(player);
+
+					if (player < 0 || player > 15) return;
+
+					const name = window.players[player]["name"];
+					const mentions = window.players[player]["mentions"];
+
+					window.messages.setHeader(player + 1 + ' ' + name);
+					window.messages.setBody(mentions.join("<br>"));
+					window.messages.open();
+				});
+
+				layer.appendChild(html2);
 			}
-		''', [number, see_html])
+		''', [number, see_html, see2_html])
 
 	def load_cards(self):
 		try:
@@ -541,6 +565,7 @@ class Tracker:
 		if info == 'all':
 			hero = self.PLAYERS[player]['hero']
 			messages = self.PLAYERS[player]['messages']
+			mentions = self.PLAYERS[player]['mentions']
 
 			self.PLAYERS[player] = {
 				'name': None,
@@ -552,7 +577,8 @@ class Tracker:
 				'equal': set(),
 				'not_equal': set(),
 				'hero': hero,
-				'messages': messages
+				'messages': messages,
+				'mentions': mentions
 			}
 
 		elif info == 'name':
@@ -667,8 +693,6 @@ class Tracker:
 			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect src role!{Back.RESET}')
 
 			return
-
-		input()
 
 		self.ROTATION[r] = dst_role
 		self.ROTATION[r]['id'] = dst_role['id']
@@ -1109,6 +1133,10 @@ class Tracker:
 
 			self.PLAYERS[number]['messages'].append(message)
 
+			for p in range(1, 17):
+				if str(p) in message:
+					self.PLAYERS[p - 1]['mentions'].append(message)
+
 		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
 
 	def find_players(self):
@@ -1252,7 +1280,8 @@ class Tracker:
 				'equal': set(),
 				'not_equal': set(),
 				'hero': False,
-				'messages': []
+				'messages': [],
+				'mentions': []
 			})
 
 		self.day_chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div/div/div[1]/div/div/div').first
@@ -1304,6 +1333,7 @@ class Tracker:
 			teams_exclude = player['teams_exclude']
 			aura = player['aura']
 			messages = player['messages']
+			mentions = player['mentions']
 
 			cards = list(self.PLAYER_CARDS.get(name, {}).values())
 			icons = self.PLAYER_ICONS.get(name, {})
@@ -1460,6 +1490,7 @@ class Tracker:
 			for p in range(16):
 				hero = self.PLAYERS[p]['hero']
 				messages = self.PLAYERS[p]['messages']
+				mentions = self.PLAYERS[p]['mentions']
 
 				self.PLAYERS[p] = {
 					'name': None,
@@ -1471,7 +1502,8 @@ class Tracker:
 					'equal': set(),
 					'not_equal': set(),
 					'hero': hero,
-					'messages': messages
+					'messages': messages,
+					'mentions': mentions
 				}
 
 			self.find_players()
@@ -1618,7 +1650,7 @@ class Grinder:
 		for i in range(1, 5):
 			for j in range(1, 5):
 				try:
-					time.sleep(0.5)
+					time.sleep(0.1)
 
 					player_base_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
 					player_img_base_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
