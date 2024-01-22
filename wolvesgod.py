@@ -1344,7 +1344,6 @@ class Tracker:
 			teams_exclude = player['teams_exclude']
 			aura = player['aura']
 			messages = player['messages']
-			mentions = player['mentions']
 
 			cards = list(self.PLAYER_CARDS.get(name, {}).values())
 			icons = self.PLAYER_ICONS.get(name, {})
@@ -1371,7 +1370,7 @@ class Tracker:
 						player_icon is None or player_icon == role_icon
 					])
 
-					icon_test = player_icon == role_icon if player_icon else True
+					icon_test = not player_icon or player_icon == role_icon
 
 					if base_test and card_test and icon_test:
 						possible.add(self.ROLES[role['id']]['name'])
