@@ -982,6 +982,9 @@ class Tracker:
 			elif 'зарезал' in service_message:
 				player = service_message.split(' зарезал ')[1]
 
+			elif 'поджёг' in service_message:
+				player = service_message.split(' поджёг ')[1]
+
 			elif 'взрывом' in service_message:
 				player = service_message.split(' был убит взрывом!')[0]
 
@@ -1133,9 +1136,17 @@ class Tracker:
 
 			self.PLAYERS[number]['messages'].append(message)
 
-			for p in range(1, 17):
-				if str(p) in message:
-					self.PLAYERS[p - 1]['mentions'].append(message)
+			number = ''
+
+			for s in message:
+				if s.isdigit():
+					number += s
+
+				elif number:
+					if int(number) in range(1, 17):
+						self.PLAYERS[int(number) - 1]['mentions'].append(message)
+
+					number = ''
 
 		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
 
@@ -1360,9 +1371,9 @@ class Tracker:
 						player_icon is None or player_icon == role_icon
 					])
 
-					icon_test = player_icon and player_icon == role_icon
+					icon_test = player_icon == role_icon if player_icon else True
 
-					if base_test and (card_test or icon_test):
+					if base_test and card_test and icon_test:
 						possible.add(self.ROLES[role['id']]['name'])
 
 			info = f'{i + 1}'
@@ -1606,8 +1617,6 @@ class Tracker:
 					print(f'{Style.BRIGHT}{Fore.GREEN}Rotation found!')
 
 					while True:
-						self.load_css()
-						self.load_modal()
 						self.monitor()
 
 						if self.process():
