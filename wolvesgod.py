@@ -982,6 +982,9 @@ class Tracker:
 			elif 'зарезал' in service_message:
 				player = service_message.split(' зарезал ')[1]
 
+			elif 'съел' in service_message:
+				player = service_message.split(' съел ')[1]
+
 			elif 'поджёг' in service_message:
 				player = service_message.split(' поджёг ')[1]
 
@@ -1059,8 +1062,11 @@ class Tracker:
 			elif 'душе' in service_message:
 				player = service_message.split(' погиб ')[0]
 
+			elif 'привязан' in service_message:
+				player = service_message.split(' был убит ')[0]
+
 			elif 'связал' in service_message:
-				player = service_message.split('Роль ')[0].split(' была')[0]
+				player = service_message.split('Роль ')[1].split(' была ')[0]
 
 			elif 'мэр!' in service_message:
 				player = service_message.split('Игрок ')[1].split(' - ')[0]
@@ -1598,8 +1604,8 @@ class Tracker:
 
 					self.get_bearer()
 					self.load_css()
-					self.load_modal()
 					self.find_players()
+					self.load_modal()
 
 					roles = self.find_roles()
 					rotations = self.get_rotations()
