@@ -12,6 +12,7 @@ from dotenv import dotenv_values
 
 init(autoreset=True)
 
+requests.packages.urllib3.disable_warnings() 
 
 class Tracker:
 	def __init__(self):
@@ -136,7 +137,7 @@ class Tracker:
 		field = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[1]/div[1]/div[2]/div[2]/div/div[1]')
 		field.evaluate('''
 			(field, [messages_html, messages_js]) => {
-				if (!window.messages) {
+				if (!document.querySelector(".modal-header")) {
 					const html = document.createElement("div");
 					html.className = "modal-content messages";
 					html.innerHTML = messages_html;
@@ -245,7 +246,7 @@ class Tracker:
 
 		ENDPOINT = 'roles'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
 
 		if not data.ok:
 			return None, None
@@ -337,7 +338,7 @@ class Tracker:
 
 		ENDPOINT = 'items/roleIcons'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
 
 		if not data.ok:
 			return
@@ -359,7 +360,7 @@ class Tracker:
 
 		ENDPOINT = 'roleRotations'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS).json()
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False).json()
 
 		rotations = {}
 
@@ -406,7 +407,7 @@ class Tracker:
 	def get_player(self, username):
 		ENDPOINT = f'players/search?username={username}'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
 
 		if not data.ok:
 			return data.status_code, data.text
@@ -432,7 +433,7 @@ class Tracker:
 
 		ENDPOINT = f'playerRoleStats/achievements/{player_id}'
 
-		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS)
+		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS, verify=False)
 
 		if not data.ok:
 			return data.status_code, data.text
@@ -897,7 +898,7 @@ class Tracker:
 						for (let m = last_message_number; m < messages.length; ++m) {
 							blocks = messages[m].querySelectorAll("div > span");
 
-							if (blocks.length >= 3) service_messages.push(messages[m].textContent);
+							if (!blocks || blocks.length >= 3) service_messages.push(messages[m].textContent);
 							else player_messages.push(messages[m].textContent);
 						}
 
@@ -1097,15 +1098,20 @@ class Tracker:
 				player = service_message.split(' героически занял место ')[0].split('Игрок ')[1]
 				number = int(player.split(' ')[0]) - 1
 				name = player.split(' ')[1]
-				dead = False
 
+				self.PLAYERS[number]['dead'] = False
 				self.PLAYERS[number]['hero'] = True
 				self.set_name(number, name)
 
 				continue
 
+			elif 'победил' in service_message:
+				return 1
+
 			if player:
 				player = player.replace('.', '').replace('!', '')
+
+				print(player)
 
 				if not number:
 					number = int(player.split(' ')[0]) - 1
@@ -1189,7 +1195,6 @@ class Tracker:
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Players found!')
 
-
 	def find_roles(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding roles...')
 
@@ -1265,6 +1270,66 @@ class Tracker:
 		print(f'{Style.BRIGHT}{Fore.GREEN}Roles found!')
 
 		return roles
+
+	def finish(self):
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Finishing...')
+
+		for _ in range(16):
+			role_icon_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[2]/div/div[3]/div/div/div[{p}]/div/div[1]/div/div/img')
+			number_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[2]/div/div[3]/div/div/div[{p}]/div/div[2]')
+
+			role_icon = role_icon_locator.evaluate('(locator) => locator.src')
+			number = number_locator.evaluate('(locator) => locator.textContent')
+
+			if 'roleIcons' in rotation_icon and 'random' not in rotation_icon:
+				rotation_icon = rotation_icon.split('roleIcons/')[1]
+
+				for icon in self.ICONS:
+					if self.ICONS[icon]['filename'] == rotation_icon:
+						role = self.ICONS[icon]['role']
+
+						if role == 'cursed-human':
+							role = 'cursed'
+
+						elif role == 'harlot':
+							role = 'red-lady'
+
+						print(role)
+
+						break
+
+			else:
+				role = rotation_icon.split('icon_')[1].split('_filled')[0]
+				role = role.replace('.svg', '').replace('.png', '')
+				role = role.replace('_', '-')
+
+				if 'cursed' in role:
+					role = 'cursed'
+
+				elif 'harlot' in role:
+					role = 'red-lady'
+
+				elif 'flowedchild' in role:
+					role = 'flower-child'
+
+				elif 'rolechanges' in role:
+					role = 'random-other'
+
+				elif 'kittenwolf' in role:
+					role = 'kitten-wolf'
+
+				elif 'nightmare' in role:
+					role = 'nightmare-werewolf'
+
+				for _ in range(2):
+					if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
+						break
+
+					role = role[role.find('-') + 1:]
+
+				print(role)
+
+		input(f'{Style.BRIGHT}{Fore.GREEN}Finished!')
 
 	def prepare(self):
 		self.ROTATION = []
@@ -1627,7 +1692,10 @@ class Tracker:
 						if self.process():
 							break
 
-						self.update_players()
+						if self.update_players():
+							break
+
+					self.finish()
 		except KeyboardInterrupt:
 			return
 		# except Exception as e:
