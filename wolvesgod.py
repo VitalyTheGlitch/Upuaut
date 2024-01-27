@@ -898,7 +898,7 @@ class Tracker:
 						for (let m = last_message_number; m < messages.length; ++m) {
 							blocks = messages[m].querySelectorAll("div > span");
 
-							if (!blocks || blocks.length >= 3) service_messages.push(messages[m].textContent);
+							if (!blocks.length || blocks.length >= 3) service_messages.push(messages[m].textContent);
 							else player_messages.push(messages[m].textContent);
 						}
 
@@ -948,7 +948,25 @@ class Tracker:
 							if role:
 								self.set_role(number, role)
 
-					continue	
+					continue
+
+				elif 'камень' in service_message:
+					players = service_message.split(' и убил его')[0].split(' бросил камень в ')
+
+					for p in range(2):
+						number = int(players[p].split(' ')[0]) - 1
+						name = players[p].split(' ')[1]	
+
+						if '/' in service_message:
+							role = players[p].split(' / ')[1].split(')')[0]
+
+						self.set_name(number, name)
+						self.PLAYERS[number]['dead'] = p
+
+						if role:
+							self.set_role(number, role)
+
+					continue
 
 				elif 'выстрелить' in service_message:
 					players = service_message.split(', но убил')[0].split(' попытался выстрелить в ')
@@ -1013,24 +1031,6 @@ class Tracker:
 							self.set_role(number, role)
 
 					continue
-
-			elif 'камень' in service_message:
-				players = service_message.split(' и убил его')[0].split(' бросил камень в ')
-
-				for p in range(2):
-					number = int(players[p].split(' ')[0]) - 1
-					name = players[p].split(' ')[1]	
-
-					if '/' in service_message:
-						role = players[p].split(' / ')[1].split(')')[0]
-
-					self.set_name(number, name)
-					self.PLAYERS[number]['dead'] = p
-
-					if role:
-						self.set_role(number, role)
-
-				continue
 
 			elif 'казнил' in service_message:
 				if 'Тюремщик' in service_message:
@@ -1110,8 +1110,6 @@ class Tracker:
 
 			if player:
 				player = player.replace('.', '').replace('!', '')
-
-				print(player)
 
 				if not number:
 					number = int(player.split(' ')[0]) - 1
@@ -1274,18 +1272,21 @@ class Tracker:
 	def finish(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Finishing...')
 
-		for _ in range(16):
+		for p in range(1, 17):
 			role_icon_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[2]/div/div[3]/div/div/div[{p}]/div/div[1]/div/div/img')
 			number_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[2]/div/div[3]/div/div/div[{p}]/div/div[2]')
 
-			role_icon = role_icon_locator.evaluate('(locator) => locator.src')
-			number = number_locator.evaluate('(locator) => locator.textContent')
+			try:
+				role_icon = role_icon_locator.evaluate('(locator) => locator.src')
+				number = number_locator.evaluate('(locator) => locator.textContent')
+			except PlaywrightTimeoutError:
+				continue
 
-			if 'roleIcons' in rotation_icon and 'random' not in rotation_icon:
-				rotation_icon = rotation_icon.split('roleIcons/')[1]
+			if 'roleIcons' in role_icon and 'random' not in role_icon:
+				role_icon = role_icon.split('roleIcons/')[1]
 
 				for icon in self.ICONS:
-					if self.ICONS[icon]['filename'] == rotation_icon:
+					if self.ICONS[icon]['filename'] == role_icon:
 						role = self.ICONS[icon]['role']
 
 						if role == 'cursed-human':
@@ -1294,12 +1295,10 @@ class Tracker:
 						elif role == 'harlot':
 							role = 'red-lady'
 
-						print(role)
-
 						break
 
 			else:
-				role = rotation_icon.split('icon_')[1].split('_filled')[0]
+				role = role_icon.split('icon_')[1].split('_filled')[0]
 				role = role.replace('.svg', '').replace('.png', '')
 				role = role.replace('_', '-')
 
@@ -1327,9 +1326,7 @@ class Tracker:
 
 					role = role[role.find('-') + 1:]
 
-				print(role)
-
-		input(f'{Style.BRIGHT}{Fore.GREEN}Finished!')
+		print(f'{Style.BRIGHT}{Fore.GREEN}Finished!')
 
 	def prepare(self):
 		self.ROTATION = []
@@ -1693,9 +1690,9 @@ class Tracker:
 							break
 
 						if self.update_players():
-							break
+							self.finish()
 
-					self.finish()
+							break
 		except KeyboardInterrupt:
 			return
 		# except Exception as e:
