@@ -1418,7 +1418,6 @@ class Tracker:
 
 			cards = list(self.PLAYER_CARDS.get(name, {}).values())
 			icons = self.PLAYER_ICONS.get(name, {})
-
 			possible = set()
 
 			if not player['role']:
@@ -1468,8 +1467,6 @@ class Tracker:
 			if possible:
 				info += ' + POSSIBLE ' + ', '.join(possible)
 
-			info += '\n'
-
 			if player['aura'] == 'GOOD':
 				info = f'{Back.GREEN}{info}{Back.RESET}'
 
@@ -1484,6 +1481,17 @@ class Tracker:
 
 			else:
 				info = f'{Style.BRIGHT}{info}'
+
+			if not cards and not icons:
+				info += ' ❌⭕'
+
+			elif not cards:
+				info += ' ❌'
+
+			elif not icons:
+				info += ' ⭕'
+
+			info += '\n'
 
 			players_info += info
 
@@ -1692,7 +1700,7 @@ class Tracker:
 						if self.process():
 							break
 
-						self.update_players():
+						self.update_players()
 		except KeyboardInterrupt:
 			return
 		# except Exception as e:
