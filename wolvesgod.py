@@ -285,6 +285,9 @@ class Tracker:
 			elif role['team'] == 'RANDOM_WEREWOLF':
 				role['team'] = 'WEREWOLF'
 
+			else:
+				role['team'] = 'SOLO'
+
 			role['team'] = role['team'].replace('_', ' ')
 
 			roles[role['id']] = {
@@ -783,17 +786,17 @@ class Tracker:
 			self.PLAYERS[player]['aura'] = info.upper()
 
 		elif info.lower() in ['villager', 'werewolf', 'solo']:
-			self.PLAYERS[player]['aura'] = info.upper()
+			self.PLAYERS[player]['team'] = info.upper()
 
 		elif info.lower().startswith('not'):
 			info = info.lower().replace('not ', '', 1)
 
 			if info in ['villager', 'werewolf', 'solo']:
-				...
+				self.PLAYERS[player]['teams_exclude'].add(info.upper())
 
 		else:
 			if self.set_role(player, info):
-				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect role or aura!{Back.RESET}')
+				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect aura / team!{Back.RESET}')
 
 	def choose_rotation(self, rotations, roles):
 		flatten_rotations = []
@@ -1689,10 +1692,7 @@ class Tracker:
 						if self.process():
 							break
 
-						if self.update_players():
-							self.finish()
-
-							break
+						self.update_players():
 		except KeyboardInterrupt:
 			return
 		# except Exception as e:
