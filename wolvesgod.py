@@ -1049,9 +1049,6 @@ class Tracker:
 				player = service_message.split(' посетил ')[0]
 				role = 'Red lady'
 
-			elif 'Силач' in service_message:
-				...
-
 			elif 'раскрыть роль' in service_message:
 				player = service_message.split(' раскрыть роль ')[1]
 				dead = False
