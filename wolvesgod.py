@@ -637,13 +637,15 @@ class Tracker:
 					break
 
 	def set_role(self, player, role):
-		for r in self.ROTATION:
-			if role.lower() == r['name'].lower():
+		for r in range(len(self.ROTATION)):
+			if role.lower() == self.ROTATION[r]['name'].lower() and not self.ROTATION[r]['used']:
+				self.ROTATION[r]['used'] = True
+
 				name = self.PLAYERS[player]['name']
 
-				self.PLAYERS[player]['role'] = r['id']
-				self.PLAYERS[player]['team'] = r['team']
-				self.PLAYERS[player]['aura'] = r['aura']
+				self.PLAYERS[player]['role'] = self.ROTATION[r]['id']
+				self.PLAYERS[player]['team'] = self.ROTATION[r]['team']
+				self.PLAYERS[player]['aura'] = self.ROTATION[r]['aura']
 
 				for equal_player in self.PLAYERS[player]['equal']:
 					self.PLAYERS[equal_player]['team'] = self.PLAYERS[player]['team']
@@ -656,13 +658,13 @@ class Tracker:
 
 				if name and r['id'] not in self.ADVANCED_ROLES:
 					for src_role in self.ADVANCED_ROLES:
-						if r['id'] in self.ADVANCED_ROLES[src_role]:
+						if self.ROTATION[r]['id'] in self.ADVANCED_ROLES[src_role]:
 							break
 
 					self.write_cards(name, {src_role: r['id']})
 
 				if r['id'] in self.ROTATION_ICONS:
-					self.write_icons(name, {r['id']: self.ROTATION_ICONS[r['id']]})
+					self.write_icons(name, {self.ROTATION[r]['id']: self.ROTATION_ICONS[self.ROTATION[r]['id']]})
 
 				break
 
@@ -700,6 +702,7 @@ class Tracker:
 
 		self.ROTATION[r] = dst_role
 		self.ROTATION[r]['id'] = dst_role['id']
+		self.ROTATION[r]['used'] = True
 
 		for p, player in enumerate(self.PLAYERS):
 			if self.PLAYERS[p]['role'] == src_role:
@@ -719,6 +722,7 @@ class Tracker:
 			if role['id'] == 'cursed':
 				self.ROTATION[r] = self.ROLES['werewolf']
 				self.ROTATION[r]['id'] = role['id']
+				self.ROTATION[r]['used'] = True
 
 				break
 
@@ -1048,6 +1052,9 @@ class Tracker:
 			elif 'Куртизанка' in service_message:
 				player = service_message.split(' посетил ')[0]
 				role = 'Red lady'
+
+			elif 'ранен' in service_message:
+				player = service_message.split(' был ')[0][6:]
 
 			elif 'раскрыть роль' in service_message:
 				player = service_message.split(' раскрыть роль ')[1]
@@ -1415,7 +1422,7 @@ class Tracker:
 
 			cards = list(self.PLAYER_CARDS.get(name, {}).values())
 			icons = self.PLAYER_ICONS.get(name, {})
-			possible = set()
+			possible = []
 
 			if not player['role']:
 				for role in self.ROTATION:
@@ -1432,15 +1439,17 @@ class Tracker:
 						self.ROLES[role['id']]['name'] in remaining[role['aura']]
 					])
 
-					card_test = all([
+					role_test = all([
 						role['id'] in cards,
-						player_icon is None or player_icon == role_icon
+						not player_icon or player_icon == role_icon
 					])
 
-					icon_test = not player_icon or player_icon == role_icon
-
-					if base_test and card_test and icon_test:
-						possible.add(self.ROLES[role['id']]['name'])
+					if base_test and role_test:
+						possible.append({
+							'role': self.ROLES[role['id']]['name'],
+							'has_card': role['id'] in cards,
+							'has_icon': bool(player_icon)
+						})
 
 			info = f'{i + 1}'
 
@@ -1462,7 +1471,26 @@ class Tracker:
 				info += f' [NOT {teams_exclude}]'
 
 			if possible:
-				info += ' + POSSIBLE ' + ', '.join(possible)
+				info += ' + POSSIBLE '
+
+				for p in range(len(possible)):
+					role = possible[p]['role']
+					has_card = possible[p]['has_card']
+					has_icon = possible[p]['has_icon']
+
+					info += role
+
+					if not has_card and not has_icon:
+						info += ' ❌⭕'
+
+					elif not has_card:
+						info += ' ❌'
+
+					elif not has_icon:
+						info += ' ⭕'
+
+					if p != len(possible) - 1:
+						info += ' / '
 
 			if player['aura'] == 'GOOD':
 				info = f'{Back.GREEN}{info}{Back.RESET}'
@@ -1478,15 +1506,6 @@ class Tracker:
 
 			else:
 				info = f'{Style.BRIGHT}{info}'
-
-			if not cards and not icons:
-				info += ' ❌⭕'
-
-			elif not cards:
-				info += ' ❌'
-
-			elif not icons:
-				info += ' ⭕'
 
 			info += '\n'
 
