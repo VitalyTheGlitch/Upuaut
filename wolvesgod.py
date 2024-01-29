@@ -466,105 +466,6 @@ class Tracker:
 
 		return 0, cards, icons
 
-	def choose_rotation(self, rotations):
-		gamemodes = list(rotations)
-
-		print()
-
-		for i, gamemode in enumerate(gamemodes):
-			print(f'{Style.BRIGHT}{Fore.GREEN}{i + 1}. {Fore.RESET}{Back.GREEN}{gamemode}')
-
-		while True:
-			choice = input(f'\n{Style.BRIGHT}{Fore.YELLOW}Gamemode:{Fore.RESET} ')
-
-			if choice.isdigit() and 1 <= int(choice) <= i + 1:
-				rotations = rotations[gamemodes[int(choice) - 1]]
-
-				break
-
-		diff_roles = []
-
-		for i in range(len(rotations)):
-			left_roles = []
-
-			for j in range(len(rotations)):
-				if j == i:
-					continue
-
-				left_roles += rotations[j]
-
-			for role in rotations[i]:
-				if role not in left_roles and len(role) == 1:
-					diff_roles.append(self.ROLES[role[0]])
-
-					break
-
-		print()
-
-		for i, role in enumerate(diff_roles):
-			print(f'{Style.BRIGHT}{Fore.GREEN}{i + 1}. {Fore.RESET}{Back.GREEN}{role["name"]}')
-
-		while True:
-			choice = input(f'\n{Style.BRIGHT}{Fore.YELLOW}Which of these roles is in the game:{Fore.RESET} ')
-
-			if choice.isdigit() and 1 <= int(choice) <= i + 1:
-				rotation = rotations[int(choice) - 1]
-
-				break
-
-			print(f'\n{Style.BRIGHT}{Back.RED}Incorrect choice!{Back.RESET}')
-
-		for i in range(len(rotation)):
-			if len(rotation[i]) > 1:
-				print()
-
-				for j, roles in enumerate(rotation[i]):
-					if len(roles) == 1:
-						role = self.ROLES[role]['name']
-
-						print(f'{Style.BRIGHT}{Fore.GREEN}{j + 1}. {Fore.RESET}{Back.GREEN}{role}')
-
-					else:
-						roles = ' + '.join([self.ROLES[role]['name'] for role in roles])
-
-						print(f'{Style.BRIGHT}{Fore.GREEN}{j + 1}. {Fore.RESET}{Back.GREEN}{roles}')
-
-				while True:
-					choice = input(f'\n{Style.BRIGHT}{Fore.YELLOW}Which of these roles is in the game:{Fore.RESET} ')
-
-					if choice.isdigit() and 1 <= int(choice) <= j + 1:
-						rotation[i] = rotation[i][int(choice) - 1]
-
-						break
-
-					print(f'\n{Style.BRIGHT}{Back.RED}Incorrect choice!{Back.RESET}')
-
-			else:
-				role = rotation[i][0]
-
-				rotation[i] = self.ROLES[role]
-
-				rotation[i]['id'] = role
-
-		while True:
-			for i in range(len(rotation)):
-				if isinstance(rotation[i], list):
-					for j in range(len(rotation[i])):
-						print(rotation[i][j])
-						role = self.ROLES[rotation[i][j]]
-						role['id'] = rotation[i][j]
-
-						rotation.insert(i + 1, role)
-
-					rotation.pop(i)
-
-					break
-
-			else:
-				break
-
-		return rotation
-
 	def clear_player_info(self, player, info):
 		if info == 'all':
 			hero = self.PLAYERS[player]['hero']
@@ -656,12 +557,12 @@ class Tracker:
 				if self.PLAYERS[player]['hero']:
 					break
 
-				if name and r['id'] not in self.ADVANCED_ROLES:
+				if name and self.ROTATION[r]['id'] not in self.ADVANCED_ROLES:
 					for src_role in self.ADVANCED_ROLES:
 						if self.ROTATION[r]['id'] in self.ADVANCED_ROLES[src_role]:
 							break
 
-					self.write_cards(name, {src_role: r['id']})
+					self.write_cards(name, {src_role: self.ROTATION[r]['id']})
 
 				if r['id'] in self.ROTATION_ICONS:
 					self.write_icons(name, {self.ROTATION[r]['id']: self.ROTATION_ICONS[self.ROTATION[r]['id']]})
@@ -872,8 +773,8 @@ class Tracker:
 			role = rotation[r]
 
 			rotation[r] = self.ROLES[role]
-
 			rotation[r]['id'] = role
+			rotation[r]['used'] = False
 
 		return rotation
 
