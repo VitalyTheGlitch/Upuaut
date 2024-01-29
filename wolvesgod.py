@@ -68,7 +68,10 @@ class Tracker:
 				'aura': None,
 				'dead': False,
 				'equal': set(),
-				'not_equal': set()
+				'not_equal': set(),
+				'hero': False,
+				'messages': [],
+				'mentions': []
 			})
 
 		self.BOT_HEADERS = {
@@ -504,6 +507,37 @@ class Tracker:
 			input(f'\n{Style.BRIGHT}{Back.RED}Invalid info!{Back.RESET}')
 
 			return
+
+	def storm(self):
+		PLAYERS_OLD = copy.deepcopy(self.PLAYERS)
+
+		self.PLAYERS = []
+
+		for _ in range(16):
+			self.PLAYERS.append({
+				'name': None,
+				'role': None,
+				'team': None,
+				'teams_exclude': set(),
+				'aura': None,
+				'dead': False,
+				'equal': set(),
+				'not_equal': set(),
+				'hero': False,
+				'messages': [],
+				'mentions': []
+			})
+
+		self.find_players()
+
+		for p in range(16):
+			for o, old in enumerate(PLAYERS_OLD):
+				if self.PLAYERS[p]['name'] == old['name']:
+					self.PLAYERS[p] = old
+
+					PLAYERS_OLD.pop(o)
+
+		self.last_message_number = 0
 
 	def set_name(self, player, name):
 		data = self.get_player(name)
@@ -954,7 +988,7 @@ class Tracker:
 				player = service_message.split(' посетил ')[0]
 				role = 'Red lady'
 
-			elif 'ранен' in service_message:
+			elif 'был ранен' in service_message:
 				player = service_message.split(' был ')[0][6:]
 
 			elif 'раскрыть роль' in service_message:
@@ -1491,28 +1525,7 @@ class Tracker:
 				input(f'\n{Style.BRIGHT}{Back.RED}Invalid info!{Back.RESET}')
 
 		elif cmd.lower() == 'storm':
-			self.last_message_number = 0
-
-			for p in range(16):
-				hero = self.PLAYERS[p]['hero']
-				messages = self.PLAYERS[p]['messages']
-				mentions = self.PLAYERS[p]['mentions']
-
-				self.PLAYERS[p] = {
-					'name': None,
-					'role': None,
-					'team': None,
-					'teams_exclude': set(),
-					'aura': None,
-					'dead': False,
-					'equal': set(),
-					'not_equal': set(),
-					'hero': hero,
-					'messages': messages,
-					'mentions': mentions
-				}
-
-			self.find_players()
+			self.storm()
 
 		else:
 			try:
