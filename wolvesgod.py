@@ -564,7 +564,7 @@ class Tracker:
 
 					self.write_cards(name, {src_role: self.ROTATION[r]['id']})
 
-				if r['id'] in self.ROTATION_ICONS:
+				if self.ROTATION[r]['id'] in self.ROTATION_ICONS:
 					self.write_icons(name, {self.ROTATION[r]['id']: self.ROTATION_ICONS[self.ROTATION[r]['id']]})
 
 				break
@@ -701,7 +701,7 @@ class Tracker:
 
 		else:
 			if self.set_role(player, info):
-				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect aura / team!{Back.RESET}')
+				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect info!{Back.RESET}')
 
 	def choose_rotation(self, rotations, roles):
 		flatten_rotations = []
