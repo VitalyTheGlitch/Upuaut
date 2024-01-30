@@ -637,7 +637,7 @@ class Tracker:
 
 		self.ROTATION[r] = dst_role
 		self.ROTATION[r]['id'] = dst_role['id']
-		self.ROTATION[r]['used'] = True
+		self.ROTATION[r]['used'] = False
 
 		for p, player in enumerate(self.PLAYERS):
 			if self.PLAYERS[p]['role'] == src_role:
@@ -649,6 +649,8 @@ class Tracker:
 					self.write_cards(player['name'], {
 						src_role: dst_role['id']
 					})
+
+				self.ROTATION[r]['used'] = True
 
 				break
 
