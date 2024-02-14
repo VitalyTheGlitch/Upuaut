@@ -573,9 +573,7 @@ class Tracker:
 
 	def set_role(self, player, role):
 		for r in range(len(self.ROTATION)):
-			if role.lower() == self.ROTATION[r]['name'].lower() and not self.ROTATION[r]['used']:
-				self.ROTATION[r]['used'] = True
-
+			if role.lower() == self.ROTATION[r]['name'].lower():
 				name = self.PLAYERS[player]['name']
 
 				self.PLAYERS[player]['role'] = self.ROTATION[r]['id']
@@ -637,7 +635,6 @@ class Tracker:
 
 		self.ROTATION[r] = dst_role
 		self.ROTATION[r]['id'] = dst_role['id']
-		self.ROTATION[r]['used'] = False
 
 		for p, player in enumerate(self.PLAYERS):
 			if self.PLAYERS[p]['role'] == src_role:
@@ -650,8 +647,6 @@ class Tracker:
 						src_role: dst_role['id']
 					})
 
-				self.ROTATION[r]['used'] = True
-
 				break
 
 	def set_cursed(self):
@@ -659,7 +654,6 @@ class Tracker:
 			if role['id'] == 'cursed':
 				self.ROTATION[r] = self.ROLES['werewolf']
 				self.ROTATION[r]['id'] = role['id']
-				self.ROTATION[r]['used'] = True
 
 				break
 
@@ -810,7 +804,6 @@ class Tracker:
 
 			rotation[r] = self.ROLES[role]
 			rotation[r]['id'] = role
-			rotation[r]['used'] = False
 
 		return rotation
 
