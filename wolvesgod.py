@@ -979,7 +979,7 @@ class Tracker:
 			elif 'Меч' in service_message:
 				player = service_message.split(' чтобы убить ')[1]
 
-			elif 'посетил' in service_message:
+			elif 'посетил' in service_message and 'Ты' not in service_message:
 				player = service_message.split(' посетил ')[0]
 				role = 'Red lady'
 
