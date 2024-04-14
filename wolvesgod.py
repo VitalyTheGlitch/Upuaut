@@ -12,12 +12,11 @@ from dotenv import dotenv_values
 
 init(autoreset=True)
 
-requests.packages.urllib3.disable_warnings() 
+requests.packages.urllib3.disable_warnings()
 
 class Tracker:
 	def __init__(self):
 		self.config = dotenv_values('.env')
-
 		try:
 			self.API_KEY = self.config['API_KEY']
 		except KeyError:
@@ -1628,10 +1627,10 @@ class Tracker:
 						self.update_players()
 		except KeyboardInterrupt:
 			return
-		# except Exception as e:
-			# input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
+		except Exception as e:
+			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
 
-			# return
+			return
 
 
 class Grinder:
@@ -2134,6 +2133,467 @@ class Miner:
 			return
 
 
+class Stalker:
+	def __init__(self):
+		self.config = dotenv_values('.env')
+
+		try:
+			self.API_KEY = self.config['API_KEY']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}API key / Instagram credentials not found!{Back.RESET}')
+
+			os.abort()
+
+		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
+		self.TARGETS = {}
+
+		self.BOT_HEADERS = {
+			'Authorization': f'Bot {self.API_KEY}',
+			'Accept': 'application/json',
+			'Content-Type': 'application/json'
+		}
+
+		self.CHANGES = []
+
+		self.load_targets()
+
+	@staticmethod
+	def convert_play_time(minutes):
+		if minutes == -1:
+			return -1
+
+		hours = str(minutes // 60).zfill(2)
+		minutes = str(minutes % 60).zfill(2)
+
+		return f'{hours}:{minutes}'
+
+	def load_targets(self):
+		try:
+			with open('targets.json', 'r', encoding='utf-8') as targets_file:
+				self.TARGETS = json.load(targets_file)
+		except:
+			self.TARGETS = {}
+
+	def write_target(self, target_id, info=None):
+		if info is None:
+			self.TARGETS.pop(target_id)
+
+		else:
+			if target_id not in self.TARGETS:
+				self.TARGETS[target_id] = []
+
+			self.TARGETS[target_id].append(info)
+
+			if len(self.TARGETS[target_id]) == 3:
+				self.TARGETS[target_id].pop(0)
+
+		with open('targets.json', 'w', encoding='utf-8') as targets_file:
+			json.dump(self.TARGETS, targets_file, ensure_ascii=False)
+
+	def add_changes(self, prev_target, target, diff, clan=False):
+		for d in diff:
+			if not target[d] or target[d] == -1:
+				target[d] = 'HIDDEN'
+
+			if not prev_target[d] or prev_target[d] == -1:
+				prev_target[d] = 'HIDDEN'
+
+			if target[d] == prev_target[d]:
+				continue
+
+			field = 'Clan ' if clan else ''
+			field += d.replace('_', ' ').capitalize()
+
+			name = target['name']
+
+			if clan:
+				target = target['clan']	
+
+			self.CHANGES.append({
+				'name': name,
+				'field': field,
+				'value': target[d],
+				'prev_value': prev_target[d]
+			})
+
+			if len(self.CHANGES) == 11:
+				self.CHANGES.pop(0)
+
+	def get_changes(self, prev_target, target):
+		if not all([prev_target, target]):
+			return 1
+
+		d1 = copy.deepcopy(prev_target)
+		d2 = copy.deepcopy(target)
+
+		clan1 = d1.pop('clan').items()
+		clan2 = d2.pop('clan').items()
+
+		info1 = d1.items()
+		info2 = d2.items()
+
+		info_diff = list(dict(info1 - info2))
+		clan_diff = list(dict(clan1 - clan2))
+
+		if not any([info_diff, clan_diff]):
+			return 1
+
+		self.add_changes(prev_target, target, info_diff)
+		self.add_changes(prev_target, target, clan_diff, True)
+
+	def get_clan(self, clan_id):
+		ENDPOINT = f'clans/{clan_id}/info'
+
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+
+		if not data.ok:
+			return data.status_code, data.text
+
+		data = data.json()
+
+		name = data.get('name', {})
+		description = data.get('description')
+		created = data.get('creationTime').replace('T', ' ').replace('Z', '')
+
+		if created:
+			created = created.split('.')[0]
+
+		xp = data.get('xp')
+		language = data.get('language')
+		tag = data.get('tag')
+		memberCount = data.get('memberCount')
+
+		clan_data = {
+			'name': name,
+			'description': description,
+			'created': created,
+			'xp': xp,
+			'language': language,
+			'tag': tag,
+			'memberCount': memberCount,
+			'members': {}
+		}
+
+		ENDPOINT = f'clans/{clan_id}/members'
+
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+
+		if not data.ok:
+			return data.status_code, data.text
+
+		data = data.json()
+
+		for player in data:
+			player_id = player.get('playerId')
+			joined = player.get('creationTime')
+			xp = player.get('xp')
+			co_leader = player.get('isCoLeader')
+
+			clan_data['members'][player_id] = {
+				'joined': joined,
+				'xp': xp,
+				'co_leader': co_leader
+			}
+
+		return 0, clan_data
+
+	def get_player_id(self, username):
+		ENDPOINT = f'players/search?username={username}'
+
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+
+		if not data.ok:
+			return data.status_code, data.text
+
+		data = data.json().get('id')
+
+		return 0, data
+
+	def get_player(self, player_id):
+		ENDPOINT = f'players/{player_id}'
+
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+
+		if not data.ok:
+			return data.status_code, data.text
+
+		data = data.json()
+		game_stats = data.get('gameStats', {})
+
+		name = data.get('username')
+		level = data.get('level')
+		bio = data.get('personalMessage')
+		status = data.get('status')
+
+		last_online = data.get('lastOnline', '').replace('T', ' ').replace('Z', '')
+
+		if last_online:
+			last_online = last_online.split('.')[0]
+
+		created = data.get('creationTime', '').replace('T', ' ').replace('Z', '')
+
+		if created:
+			created = created.split('.')[0]
+
+		received_roses = data.get('receivedRosesCount')
+		sent_roses = data.get('sentRosesCount')
+
+		win_count = game_stats.get('totalWinCount')
+		lose_count = game_stats.get('totalLoseCount')
+		tie_count = game_stats.get('totalTieCount')
+
+		play_time = game_stats.get('totalPlayTimeInMinutes')
+
+		village_win_count = game_stats.get('villageWinCount')
+		village_lose_count = game_stats.get('villageLoseCount')
+
+		werewolf_win_count = game_stats.get('werewolfWinCount')
+		werewolf_lose_count = game_stats.get('werewolfLoseCount')
+
+		voting_win_count = game_stats.get('votingWinCount')
+		voting_lose_count = game_stats.get('votingLoseCount')
+
+		solo_win_count = game_stats.get('soloWinCount')
+		solo_lose_count = game_stats.get('soloLoseCount')
+
+		clan_id = data.get('clanId')
+		clan = {}
+
+		if clan_id:
+			clan = self.get_clan(clan_id)
+
+			if not clan[0]:
+				clan = clan[1]
+				clan.update(clan.pop('members').get(player_id, {}))
+
+		player_data = {
+			'name': name,
+			'level': level,
+			'bio': bio,
+			'status': status,
+			'last_online': last_online,
+			'created': created,
+			'received_roses': received_roses,
+			'sent_roses': sent_roses,
+			'win_count': win_count,
+			'lose_count': lose_count,
+			'tie_count': tie_count,
+			'play_time': play_time,
+			'village_win_count': village_win_count,
+			'village_lose_count': village_lose_count,
+			'werewolf_win_count': werewolf_win_count,
+			'werewolf_lose_count': werewolf_lose_count,
+			'voting_win_count': voting_win_count,
+			'voting_lose_count': voting_lose_count,
+			'solo_win_count': solo_win_count,
+			'solo_lose_count': solo_lose_count,
+			'clan': clan
+		}
+
+		return 0, player_data
+
+	def update_targets(self):
+		for target_id in self.TARGETS:
+			data = self.get_player(target_id)
+
+			if data[0]:
+				input(f'\n{Style.BRIGHT}{Back.RED}Error {data[0]}: {data[1]}{Back.RESET}')
+
+				continue
+
+			self.write_target(target_id, data[1])
+
+			time.sleep(0.1)
+
+	def monitor(self):
+		banner(self.__class__.__name__)
+
+		targets_info = ''
+
+		for i, target in enumerate(self.TARGETS.values()):
+			prev_target = target[-2] if len(target) >= 2 else {}
+			target = target[-1]
+
+			if not self.get_changes(prev_target, target):
+				playsound('audio/illusionist.mp3')
+
+			name = target['name']
+			level = target['level']
+
+			if level == -1:
+				level = '?'
+
+			status = target['status']
+
+			if status == 'PLAY':
+				status = '✅'
+
+			elif status == 'DEFAULT':
+				status = '⚪'
+
+			elif status == 'DND':
+				status = '🔴'
+
+			elif status == 'OFFLINE':
+				status = '📵'
+
+			last_online = target['last_online']
+			created = target['created']
+
+			received_roses = target['received_roses']
+			sent_roses = target['sent_roses']
+
+			win_count = target['win_count']
+			lose_count = target['lose_count']
+			tie_count = target['tie_count']
+
+			play_time = target['play_time']
+			play_time = self.convert_play_time(play_time)
+
+			village_win_count = target['village_win_count']
+			village_lose_count = target['village_win_count']
+
+			werewolf_win_count = target['werewolf_win_count']
+			werewolf_lose_count = target['werewolf_lose_count']
+
+			voting_win_count = target['voting_win_count']
+			voting_lose_count = target['voting_lose_count']
+
+			solo_win_count = target['solo_win_count']
+			solo_lose_count = target['solo_lose_count']
+
+			clan = target['clan']
+			tag = clan.get('tag', '')
+
+			if tag:
+				tag += ' |'
+
+			info = f'{i + 1}'.ljust(3)
+			info += f'{tag}{name} {level} {status}\n'
+			info += f'🌹 {received_roses} {sent_roses}\n'
+
+			if win_count != -1:
+				info += f'🥇 {win_count} ❌ {lose_count} ☠  {tie_count}\n's
+
+			if play_time != -1:
+				info += f'⌚ {play_time}\n'
+
+			if village_win_count != -1:
+				info += f'🏠 {village_win_count} {village_lose_count}\n'
+
+			if werewolf_win_count != -1:
+				info += f'🐺 {werewolf_win_count} {werewolf_lose_count}\n'
+
+			if voting_win_count != -1:
+				info += f'👆 {voting_win_count} {voting_lose_count}\n'
+
+			if solo_win_count != -1:
+				info += f'🔪 {solo_win_count} {solo_lose_count}\n'
+
+			targets_info += info + '\n'
+
+		history = f'{Style.BRIGHT}{Back.RED}HISTORY{Back.RESET}\n\n'
+
+		for change in self.CHANGES:
+			name = change['name']
+			field = change['field']
+			prev_value = change['prev_value']
+			value = change['value']
+
+			history += f'{name}{Fore.RED}\'s{Fore.RESET} {field} {Fore.RED}has changed from{Fore.RESET} {prev_value} {Fore.RED}to{Fore.RESET} {value}\n'
+
+		print(f'{Style.BRIGHT}{targets_info}{history}')
+
+	def process(self):
+		cmd = input(f'{Style.BRIGHT}{Fore.RED}>{Fore.RESET} ')
+
+		if not cmd:
+			return
+
+		elif cmd.lower() == 'end':
+			return 1
+
+		else:
+			try:
+				cmd, target = cmd.split(' ')
+			except ValueError:
+				print(f'\n{Style.BRIGHT}{Fore.RED}Usage:')
+				print(f'{Style.BRIGHT}{Fore.RED}Add [WOLVESVILLE NAME]')
+				print(f'{Style.BRIGHT}{Fore.RED}Delete [ID]')
+				print(f'{Style.BRIGHT}{Fore.RED}end - stop stalker')
+				input()
+
+				return
+
+			if cmd.lower() == 'add':
+				if len(self.TARGETS) == 20:
+					input(f'\n{Style.BRIGHT}{Back.RED}Too many targets!{Back.RESET}')
+
+					return
+
+				data = self.get_player_id(target)
+
+				if data[0] == 404:
+					input(f'\n{Style.BRIGHT}{Back.RED}Invalid name!{Back.RESET}')
+
+					return
+
+				elif data[0]:
+					input(f'\n{Style.BRIGHT}{Back.RED}Error {data[0]}: {data[1]}{Back.RESET}')
+
+					return
+
+				target_id = data[1]
+
+				if target_id in self.TARGETS:
+					input(f'\n{Style.BRIGHT}{Back.RED}The players is already a target!{Back.RESET}')
+
+					return
+
+				data = self.get_player(target_id)
+
+				if data[0]:
+					input(f'\n{Style.BRIGHT}{Back.RED}Error {data[0]}: {data[1]}{Back.RESET}')
+
+					return
+
+				self.write_target(target_id, data[1])
+
+			elif cmd.lower() == 'delete':
+				try:
+					target = int(target) - 1
+
+					if target < 0:
+						input(f'\n{Style.BRIGHT}{Back.RED}Invalid ID!{Back.RESET}')
+
+					else:
+						target_id = list(self.TARGETS)[target]
+
+						self.write_target(target_id)
+				except (ValueError, IndexError):
+					input(f'\n{Style.BRIGHT}{Back.RED}Invalid ID!{Back.RESET}')
+
+			else:
+				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect command!{Back.RESET}')
+
+	def run(self):
+		banner(self.__class__.__name__)
+
+		try:
+			while True:
+				self.update_targets()
+				self.monitor()
+
+				if self.process():
+					break
+		except KeyboardInterrupt:
+			return
+		except Exception as e:
+			input(f'\n{Style.BRIGHT}{Back.RED}{str(e)}{Back.RESET}')
+
+			return
+
+
 def banner(module=None):
 	os.system('cls')
 
@@ -2151,7 +2611,7 @@ def run():
 	while True:
 		banner()
 
-		modules = [Tracker(), Grinder(), Miner()]
+		modules = [Tracker(), Grinder(), Miner(), Stalker()]
 		module = None
 
 		for i, module in enumerate(modules):

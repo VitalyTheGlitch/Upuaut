@@ -1,4 +1,4 @@
-colorama=
+colorama
 fake_useragent
 playsound
 playwright
