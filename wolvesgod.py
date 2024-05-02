@@ -5,7 +5,6 @@ import json
 import os
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-from fake_useragent import UserAgent
 from playsound import playsound
 from colorama import Back, Fore, Style, init
 from dotenv import dotenv_values
@@ -17,10 +16,12 @@ requests.packages.urllib3.disable_warnings()
 class Tracker:
 	def __init__(self):
 		self.config = dotenv_values('.env')
+
 		try:
 			self.API_KEY = self.config['API_KEY']
+			self.USER_AGENT = self.config['USER_AGENT']
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}API token not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}API token / User Agent not found!{Back.RESET}')
 
 			os.abort()
 
@@ -51,7 +52,7 @@ class Tracker:
 		self.PLAYERS = []
 
 		self.ROLES = []
-		self.ADVANCED_ROLES = []
+		self.ADVANCED_ROLES = {}
 
 		self.ROTATION_ICONS = {}
 
@@ -83,7 +84,6 @@ class Tracker:
 		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\WolvesGod'
 		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 
-		self.user_agent = UserAgent(verify_ssl=False)
 		self.page = None
 		self.day_chat = None
 		self.dead_chat = None
@@ -1151,6 +1151,7 @@ class Tracker:
 		roles = []
 
 		for rotation_icon in rotation_icons:
+			rotation_icon = rotation_icon.replace('@3x', '')
 			if 'roleIcons' in rotation_icon and 'random' not in rotation_icon:
 				rotation_icon = rotation_icon.split('roleIcons/')[1]
 
@@ -1170,6 +1171,10 @@ class Tracker:
 
 						break
 
+				else:
+					print(rotation_icon, 'not found!')
+					input()
+
 			else:
 				role = rotation_icon.split('icon_')[1].split('_filled')[0]
 				role = role.replace('.svg', '').replace('.png', '')
@@ -1184,7 +1189,7 @@ class Tracker:
 				elif 'flowedchild' in role:
 					role = 'flower-child'
 
-				elif 'rolechanges' in role:
+				elif 'rolechange' in role:
 					role = 'random-other'
 
 				elif 'kittenwolf' in role:
@@ -1200,6 +1205,8 @@ class Tracker:
 					role = role[role.find('-') + 1:]
 
 				roles.append(role)
+
+		input()
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Roles found!')
 
@@ -1550,7 +1557,7 @@ class Tracker:
 
 				context = playwright.chromium.launch_persistent_context(
 					user_data_dir=self.USER_DATA_DIR,
-					user_agent=self.user_agent.random,
+					user_agent=self.USER_AGENT,
 					viewport={
 						'width': 960,
 						'height': 972
@@ -1627,17 +1634,23 @@ class Tracker:
 						self.update_players()
 		except KeyboardInterrupt:
 			return
-		except Exception as e:
-			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
+		# except Exception as e:
+		# 	input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
 
-			return
-
+		# 	return
 
 class Grinder:
 	def __init__(self):
+		try:
+			self.USER_AGENT = self.config['USER_AGENT']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}User Agent not found!{Back.RESET}')
+
+			os.abort()
+
 		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\WolvesGod'
 		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-		self.user_agent = UserAgent(verify_ssl=False)
+		self.USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 		self.page = None
 
 	def act_villager(self):
@@ -1923,7 +1936,7 @@ class Grinder:
 
 				context = playwright.chromium.launch_persistent_context(
 					user_data_dir=self.USER_DATA_DIR,
-					user_agent=self.user_agent.random,
+					user_agent=self.USER_AGENT,
 					viewport={
 						'width': 960,
 						'height': 972
@@ -2140,7 +2153,7 @@ class Stalker:
 		try:
 			self.API_KEY = self.config['API_KEY']
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}API key / Instagram credentials not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}API key not found!{Back.RESET}')
 
 			os.abort()
 
@@ -2473,7 +2486,7 @@ class Stalker:
 			info += f'🌹 {received_roses} {sent_roses}\n'
 
 			if win_count != -1:
-				info += f'🥇 {win_count} ❌ {lose_count} ☠  {tie_count}\n's
+				info += f'🥇 {win_count} ❌ {lose_count} ☠  {tie_count}\n'
 
 			if play_time != -1:
 				info += f'⌚ {play_time}\n'
