@@ -44,9 +44,10 @@ class Tracker:
 		self.load_assets()
 
 		self.BEARER_TOKEN = None
+		self.CF_JWT = None
 
 		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
-		self.BEARER_BASE_URL = 'https://api-core.wolvesville.com/'
+		self.BEARER_BASE_URL = 'https://core.api-wolvesville.com/'
 
 		self.ROTATION = []
 		self.PLAYERS = []
@@ -281,7 +282,13 @@ class Tracker:
 			elif role['name'] == 'Random other':
 				role['name'] = 'RO'
 
-			if role['team'] == 'RANDOM_VILLAGER':
+			if role['team'] == 'VILLAGER':
+				role['team'] = 'VILLAGER'
+
+			elif role['team'] == 'WEREWOLF':
+				role['team'] = 'WEREWOLF'
+
+			elif role['team'] == 'RANDOM_VILLAGER':
 				role['team'] = 'VILLAGER'
 
 			elif role['team'] == 'RANDOM_WEREWOLF':
@@ -424,6 +431,9 @@ class Tracker:
 		cards = {}
 
 		for card in data['roleCards']:
+			if card['rarity'] in ['COMMON', 'RARe']:
+				continue
+
 			if card['roleId1'] == 'harlot':
 				card['roleId1'] = 'red-lady'
 
@@ -437,6 +447,9 @@ class Tracker:
 				cards[card['roleId1']] = card['roleId2']
 
 		ENDPOINT = f'playerRoleStats/achievements/{player_id}'
+
+		print(f'{self.BEARER_BASE_URL}{ENDPOINT}')
+		print(self.BEARER_HEADERS)
 
 		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS, verify=False)
 
@@ -808,9 +821,11 @@ class Tracker:
 
 	def get_bearer(self):
 		self.BEARER_TOKEN = self.page.evaluate('() => JSON.parse(localStorage.getItem("authtokens"))["idToken"]')
+		self.CF_JWT = self.page.evaluate('() => JSON.parse(localStorage.getItem("cloudflare-turnstile-jwt"))')
 
 		self.BEARER_HEADERS = {
 			'Authorization': f'Bearer {self.BEARER_TOKEN}',
+			'Cf-Jwt': f'{self.CF_JWT}',
 			'Ids': '1'
 		}
 
@@ -852,8 +867,6 @@ class Tracker:
 				continue
 
 		for service_message in service_messages:
-			print(service_message)
-
 			player = None
 			number = None
 			name = None
@@ -989,10 +1002,6 @@ class Tracker:
 				player = service_message.split(' раскрыть роль ')[1]
 				dead = False
 
-			elif 'раскрыл роль' in service_message:
-				player = service_message.split(' раскрыл роль ')[1]
-				dead = False
-
 			elif 'отомщена' in service_message:
 				player = service_message.split(' отомщена, ')[1].split(' погиб!')[0]
 
@@ -1053,9 +1062,6 @@ class Tracker:
 
 				if role is None and '/' in service_message:
 					role = player.split(' / ')[1].split(')')[0]
-
-				print(player)
-				print(number, name, role)
 
 				self.set_name(number, name)
 				self.PLAYERS[number]['dead'] = dead
@@ -1172,8 +1178,7 @@ class Tracker:
 						break
 
 				else:
-					print(rotation_icon, 'not found!')
-					input()
+					input(rotation_icon, 'not found!')
 
 			else:
 				role = rotation_icon.split('icon_')[1].split('_filled')[0]
@@ -1205,8 +1210,6 @@ class Tracker:
 					role = role[role.find('-') + 1:]
 
 				roles.append(role)
-
-		input()
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Roles found!')
 
@@ -1634,13 +1637,15 @@ class Tracker:
 						self.update_players()
 		except KeyboardInterrupt:
 			return
-		# except Exception as e:
-		# 	input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
+		except Exception as e:
+			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
 
-		# 	return
+			return
 
 class Grinder:
 	def __init__(self):
+		self.config = dotenv_values('.env')
+
 		try:
 			self.USER_AGENT = self.config['USER_AGENT']
 		except KeyError:

@@ -154,3 +154,4 @@ cython_debug/
 # Players data
 cards.json
 icons.json
+targets.json

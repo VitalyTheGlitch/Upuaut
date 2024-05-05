@@ -1,5 +1,4 @@
 colorama
-fake_useragent
 playsound
 playwright
 PyAutoGUI
