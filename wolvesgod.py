@@ -2267,7 +2267,7 @@ class Stalker:
 		self.add_changes(prev_target, target, clan_diff, True)
 		self.add_changes(prev_target, target, info_diff)
 
-		return clan_diff + info_diff
+		return clan_diff, info_diff
 
 	def get_clan(self, clan_id):
 		ENDPOINT = f'clans/{clan_id}/info'
@@ -2480,12 +2480,18 @@ class Stalker:
 			if changes:
 				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
 
+				clan_changes, info_changes = changes
+
 				for field in target:
 					if field == 'status':
 						continue
 
-					if field in changes:
+					if field in info_changes:
 						target[field] = f'{Fore.GREEN}{target[field]}{Fore.RESET}'
+
+				for field in target['clan']:
+					if field in clan_changes:
+						target['clan'][field] = f'{Fore.GREEN}{target["clan"][field]}{Fore.RESET}'
 
 			player_id = target['id']
 			name = target['name']

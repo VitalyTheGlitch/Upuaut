@@ -155,3 +155,4 @@ cython_debug/
 cards.json
 icons.json
 targets.json
+targets/
