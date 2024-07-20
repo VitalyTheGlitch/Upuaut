@@ -1,4 +1,5 @@
 import requests
+import threading
 import pyautogui
 import copy
 import json
@@ -12,6 +13,8 @@ from dotenv import dotenv_values
 init(autoreset=True)
 
 requests.packages.urllib3.disable_warnings()
+
+updating = False
 
 class Tracker:
 	def __init__(self):
@@ -447,9 +450,6 @@ class Tracker:
 				cards[card['roleId1']] = card['roleId2']
 
 		ENDPOINT = f'playerRoleStats/achievements/{player_id}'
-
-		print(f'{self.BEARER_BASE_URL}{ENDPOINT}')
-		print(self.BEARER_HEADERS)
 
 		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS, verify=False)
 
@@ -1544,7 +1544,7 @@ class Tracker:
 				print(f'{Style.BRIGHT}{Fore.RED}Clear [number] [all / name / team / aura / equal]')
 				print(f'{Style.BRIGHT}{Fore.RED}Storm to rediscover')
 				print(f'{Style.BRIGHT}{Fore.RED}Enter to update')
-				print(f'{Style.BRIGHT}{Fore.RED}end - stop tracker')
+				print(f'{Style.BRIGHT}{Fore.RED}end - stop Tracker')
 				input()
 
 				return
@@ -2150,7 +2150,6 @@ class Miner:
 
 			return
 
-
 class Stalker:
 	def __init__(self):
 		self.config = dotenv_values('.env')
@@ -2171,9 +2170,9 @@ class Stalker:
 			'Content-Type': 'application/json'
 		}
 
-		self.CHANGES = []
-
 		self.load_targets()
+		
+		threading.Thread(target=self.auto_update, daemon=True).start()
 
 	@staticmethod
 	def convert_play_time(minutes):
@@ -2208,7 +2207,17 @@ class Stalker:
 		with open('targets.json', 'w', encoding='utf-8') as targets_file:
 			json.dump(self.TARGETS, targets_file, ensure_ascii=False)
 
-	def add_changes(self, prev_target, target, diff, clan=False):
+	@staticmethod
+	def add_changes(prev_target, target, diff, clan=False):
+		if not os.path.isdir('targets'):
+			os.mkdir('targets')
+
+		target_id = target['id']
+
+		if clan:
+			target = target['clan']
+			prev_target = prev_target['clan']	
+
 		for d in diff:
 			if not target[d] or target[d] == -1:
 				target[d] = 'HIDDEN'
@@ -2222,24 +2231,23 @@ class Stalker:
 			field = 'Clan ' if clan else ''
 			field += d.replace('_', ' ').capitalize()
 
-			name = target['name']
+			with open(f'targets/{target_id}.txt', 'a', encoding='utf-8') as f:
+				prev_value = prev_target[d]
+				value = target[d]
 
-			if clan:
-				target = target['clan']	
+				change_info = f'{field}: {prev_value} -> {value}\n'
 
-			self.CHANGES.append({
-				'name': name,
-				'field': field,
-				'value': target[d],
-				'prev_value': prev_target[d]
-			})
+				f.write(change_info)
 
-			if len(self.CHANGES) == 11:
-				self.CHANGES.pop(0)
+	def auto_update(self):
+		while True:
+			time.sleep(600)
+
+			self.update_targets()
 
 	def get_changes(self, prev_target, target):
 		if not all([prev_target, target]):
-			return 1
+			return
 
 		d1 = copy.deepcopy(prev_target)
 		d2 = copy.deepcopy(target)
@@ -2254,10 +2262,12 @@ class Stalker:
 		clan_diff = list(dict(clan1 - clan2))
 
 		if not any([info_diff, clan_diff]):
-			return 1
+			return
 
-		self.add_changes(prev_target, target, info_diff)
 		self.add_changes(prev_target, target, clan_diff, True)
+		self.add_changes(prev_target, target, info_diff)
+
+		return clan_diff + info_diff
 
 	def get_clan(self, clan_id):
 		ENDPOINT = f'clans/{clan_id}/info'
@@ -2306,11 +2316,13 @@ class Stalker:
 			joined = player.get('creationTime')
 			xp = player.get('xp')
 			co_leader = player.get('isCoLeader')
+			flair = player.get('flair')
 
 			clan_data['members'][player_id] = {
 				'joined': joined,
 				'xp': xp,
-				'co_leader': co_leader
+				'co_leader': co_leader,
+				'flair': flair
 			}
 
 		return 0, clan_data
@@ -2343,15 +2355,30 @@ class Stalker:
 		bio = data.get('personalMessage')
 		status = data.get('status')
 
+		if level == -1:
+			level = '?'
+
+		if status == 'PLAY':
+			status = '✅'
+
+		elif status == 'DEFAULT':
+			status = '⚪'
+
+		elif status == 'DND':
+			status = '🔴'
+
+		elif status == 'OFFLINE':
+			status = '📵'
+
 		last_online = data.get('lastOnline', '').replace('T', ' ').replace('Z', '')
 
 		if last_online:
-			last_online = last_online.split('.')[0]
+			last_online = last_online.split('.')[0].replace('-', '.')
 
-		created = data.get('creationTime', '').replace('T', ' ').replace('Z', '')
+		created = data.get('creationTime', '').replace('-', '.').replace('T', ' ').replace('Z', '')
 
 		if created:
-			created = created.split('.')[0]
+			created = created.split('.')[0].replace('-', '.')
 
 		received_roses = data.get('receivedRosesCount')
 		sent_roses = data.get('sentRosesCount')
@@ -2360,7 +2387,7 @@ class Stalker:
 		lose_count = game_stats.get('totalLoseCount')
 		tie_count = game_stats.get('totalTieCount')
 
-		play_time = game_stats.get('totalPlayTimeInMinutes')
+		play_time = self.convert_play_time(game_stats.get('totalPlayTimeInMinutes', -1))
 
 		village_win_count = game_stats.get('villageWinCount')
 		village_lose_count = game_stats.get('villageLoseCount')
@@ -2385,6 +2412,7 @@ class Stalker:
 				clan.update(clan.pop('members').get(player_id, {}))
 
 		player_data = {
+			'id': player_id,
 			'name': name,
 			'level': level,
 			'bio': bio,
@@ -2410,8 +2438,21 @@ class Stalker:
 
 		return 0, player_data
 
-	def update_targets(self):
-		for target_id in self.TARGETS:
+	def update_targets(self, target_id=None):
+		global updating
+
+		if updating:
+			return
+
+		updating = True
+
+		if target_id:
+			targets = [target_id]
+
+		else:
+			targets = self.TARGETS
+
+		for target_id in targets:
 			data = self.get_player(target_id)
 
 			if data[0]:
@@ -2423,40 +2464,36 @@ class Stalker:
 
 			time.sleep(0.1)
 
+		updating = False
+
 	def monitor(self):
 		banner(self.__class__.__name__)
 
 		targets_info = ''
 
 		for i, target in enumerate(self.TARGETS.values()):
-			prev_target = target[-2] if len(target) >= 2 else {}
-			target = target[-1]
+			prev_target = copy.deepcopy(target[0]) if len(target) == 2 else {}
+			target = copy.deepcopy(target[-1])
 
-			if not self.get_changes(prev_target, target):
-				playsound('audio/illusionist.mp3')
+			changes = self.get_changes(prev_target, target)
 
+			if changes:
+				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
+
+				for field in target:
+					if field == 'status':
+						continue
+
+					if field in changes:
+						target[field] = f'{Fore.GREEN}{target[field]}{Fore.RESET}'
+
+			player_id = target['id']
 			name = target['name']
 			level = target['level']
-
-			if level == -1:
-				level = '?'
-
+			bio = target['bio']
 			status = target['status']
 
-			if status == 'PLAY':
-				status = '✅'
-
-			elif status == 'DEFAULT':
-				status = '⚪'
-
-			elif status == 'DND':
-				status = '🔴'
-
-			elif status == 'OFFLINE':
-				status = '📵'
-
 			last_online = target['last_online']
-			created = target['created']
 
 			received_roses = target['received_roses']
 			sent_roses = target['sent_roses']
@@ -2466,10 +2503,9 @@ class Stalker:
 			tie_count = target['tie_count']
 
 			play_time = target['play_time']
-			play_time = self.convert_play_time(play_time)
 
 			village_win_count = target['village_win_count']
-			village_lose_count = target['village_win_count']
+			village_lose_count = target['village_lose_count']
 
 			werewolf_win_count = target['werewolf_win_count']
 			werewolf_lose_count = target['werewolf_lose_count']
@@ -2481,13 +2517,26 @@ class Stalker:
 			solo_lose_count = target['solo_lose_count']
 
 			clan = target['clan']
-			tag = clan.get('tag', '')
+			tag = clan.get('tag')
+			xp = clan.get('xp')
+			co_leader = clan.get('co_leader')
+			flair = clan.get('flair')
 
 			if tag:
 				tag += ' |'
 
-			info = f'{i + 1}'.ljust(3)
-			info += f'{tag}{name} {level} {status}\n'
+			info = f'{i + 1}'.ljust(3) + f'{player_id}\n'
+			info += f'{tag}{name} {level} {status} {last_online}\n'
+
+			if clan:
+				info += f'🏰  {xp}xp ({flair}) '
+
+				if co_leader:
+					info += 'CO-LEADER'
+
+				info += '\n'
+
+			info += f'{bio}\n'
 			info += f'🌹 {received_roses} {sent_roses}\n'
 
 			if win_count != -1:
@@ -2510,17 +2559,18 @@ class Stalker:
 
 			targets_info += info + '\n'
 
-		history = f'{Style.BRIGHT}{Back.RED}HISTORY{Back.RESET}\n\n'
+		if targets_info:
+			print(f'{Style.BRIGHT}{targets_info}')
 
-		for change in self.CHANGES:
-			name = change['name']
-			field = change['field']
-			prev_value = change['prev_value']
-			value = change['value']
-
-			history += f'{name}{Fore.RED}\'s{Fore.RESET} {field} {Fore.RED}has changed from{Fore.RESET} {prev_value} {Fore.RED}to{Fore.RESET} {value}\n'
-
-		print(f'{Style.BRIGHT}{targets_info}{history}')
+		else:
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Usage:')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Add [IN-GAME NAME]')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Delete [ID]')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}U - update all')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}U [ID] - update chosen player')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Enter - refresh')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}end - stop Stalker')
+			print()
 
 	def process(self):
 		cmd = input(f'{Style.BRIGHT}{Fore.RED}>{Fore.RESET} ')
@@ -2531,14 +2581,20 @@ class Stalker:
 		elif cmd.lower() == 'end':
 			return 1
 
+		elif cmd.lower() == 'u':
+			self.update_targets()
+
 		else:
 			try:
 				cmd, target = cmd.split(' ')
 			except ValueError:
 				print(f'\n{Style.BRIGHT}{Fore.RED}Usage:')
-				print(f'{Style.BRIGHT}{Fore.RED}Add [WOLVESVILLE NAME]')
+				print(f'{Style.BRIGHT}{Fore.RED}Add [IN-GAME NAME]')
 				print(f'{Style.BRIGHT}{Fore.RED}Delete [ID]')
-				print(f'{Style.BRIGHT}{Fore.RED}end - stop stalker')
+				print(f'{Style.BRIGHT}{Fore.RED}U - update all')
+				print(f'{Style.BRIGHT}{Fore.RED}U [ID] - update chosen player')
+				print(f'{Style.BRIGHT}{Fore.RED}Enter - refresh')
+				print(f'{Style.BRIGHT}{Fore.RED}end - stop Stalker')
 				input()
 
 				return
@@ -2564,7 +2620,7 @@ class Stalker:
 				target_id = data[1]
 
 				if target_id in self.TARGETS:
-					input(f'\n{Style.BRIGHT}{Back.RED}The players is already a target!{Back.RESET}')
+					input(f'\n{Style.BRIGHT}{Back.RED}The player is already a target!{Back.RESET}')
 
 					return
 
@@ -2591,6 +2647,20 @@ class Stalker:
 				except (ValueError, IndexError):
 					input(f'\n{Style.BRIGHT}{Back.RED}Invalid ID!{Back.RESET}')
 
+			elif cmd.lower() == 'u':
+				try:
+					target = int(target) - 1
+
+					if target < 0:
+						input(f'\n{Style.BRIGHT}{Back.RED}Invalid ID!{Back.RESET}')
+
+					else:
+						target_id = list(self.TARGETS)[target]
+
+						self.update_targets(target_id)
+				except (ValueError, IndexError):
+					input(f'\n{Style.BRIGHT}{Back.RED}Invalid ID!{Back.RESET}')
+
 			else:
 				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect command!{Back.RESET}')
 
@@ -2599,7 +2669,6 @@ class Stalker:
 
 		try:
 			while True:
-				self.update_targets()
 				self.monitor()
 
 				if self.process():
