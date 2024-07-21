@@ -2450,7 +2450,7 @@ class Stalker:
 			targets = [target_id]
 
 		else:
-			targets = self.TARGETS
+			targets = list(self.TARGETS)
 
 		for target_id in targets:
 			data = self.get_player(target_id)
@@ -2463,6 +2463,17 @@ class Stalker:
 			self.write_target(target_id, data[1])
 
 			time.sleep(0.1)
+
+		for i, target in enumerate(self.TARGETS.values()):
+			prev_target = copy.deepcopy(target[0]) if len(target) == 2 else {}
+			target = copy.deepcopy(target[-1])
+
+			changes = self.get_changes(prev_target, target)
+
+			if changes:
+				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
+				
+				break
 
 		updating = False
 
@@ -2478,8 +2489,6 @@ class Stalker:
 			changes = self.get_changes(prev_target, target)
 
 			if changes:
-				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
-
 				clan_changes, info_changes = changes
 
 				for field in target:
