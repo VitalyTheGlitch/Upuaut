@@ -14,3 +14,5 @@ echo.
 pause
 
 "C:\Program Files\Google\Chrome\Application\chrome.exe" --user-data-dir="C:\Users\vital\AppData\Local\Google\Chrome\User Data\WolvesGod" wolvesville.com
+
+color f

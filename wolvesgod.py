@@ -4,8 +4,10 @@ import pyautogui
 import copy
 import json
 import os
+import subprocess
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from copy import deepcopy
 from playsound import playsound
 from colorama import Back, Fore, Style, init
 from dotenv import dotenv_values
@@ -16,17 +18,20 @@ requests.packages.urllib3.disable_warnings()
 
 updating = False
 
+
 class Tracker:
 	def __init__(self):
 		self.config = dotenv_values('.env')
 
 		try:
-			self.API_KEY = self.config['API_KEY']
+			self.API_KEYS = self.config['API_KEYS'].split(',')
 			self.USER_AGENT = self.config['USER_AGENT']
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}API token / User Agent not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}API key(s) / User Agent not found!{Back.RESET}')
 
 			os.abort()
+
+		self.API_KEY = self.switch_api_key()
 
 		self.ASSET_PATHS = {
 			'see': {
@@ -78,11 +83,11 @@ class Tracker:
 				'mentions': []
 			})
 
-		self.BOT_HEADERS = {
-			'Authorization': f'Bot {self.API_KEY}',
-			'Accept': 'application/json',
-			'Content-Type': 'application/json'
-		}
+		self.PREV_PLAYERS = deepcopy(self.PLAYERS)
+
+		self.DISCOVERED = [False, False]
+		self.PLAYER_LAYERS = []
+
 		self.BEARER_HEADERS = {}
 
 		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\WolvesGod'
@@ -93,6 +98,21 @@ class Tracker:
 		self.dead_chat = None
 		self.last_message_number = 0
 
+	@property
+	def bot_headers(self):
+		api_key = next(self.API_KEY)
+
+		return {
+			'Authorization': f'Bot {api_key}',
+			'Accept': 'application/json',
+			'Content-Type': 'application/json'
+		}
+
+	def switch_api_key(self):
+		while True:
+			for key in self.API_KEYS:
+				yield key
+		
 	def load_assets(self):
 		try:
 			for asset in self.ASSET_PATHS:
@@ -215,7 +235,7 @@ class Tracker:
 
 	def load_cards(self):
 		try:
-			with open('cards.json', 'r') as cards_file:
+			with open('data/cards.json', 'r') as cards_file:
 				self.PLAYER_CARDS = json.load(cards_file)
 		except:
 			self.PLAYER_CARDS = {}
@@ -227,12 +247,16 @@ class Tracker:
 		else:
 			self.PLAYER_CARDS[player].update(cards)
 
-		with open('cards.json', 'w') as cards_file:
+	def save_cards(self):
+		if not os.path.isdir('data'):
+			os.mkdir('data')
+
+		with open('data/cards.json', 'w') as cards_file:
 			json.dump(self.PLAYER_CARDS, cards_file)
 
 	def load_icons(self):
 		try:
-			with open('icons.json', 'r') as icons_file:
+			with open('data/icons.json', 'r') as icons_file:
 				self.PLAYER_ICONS = json.load(icons_file)
 		except:
 			self.PLAYER_ICONS = {}
@@ -244,7 +268,11 @@ class Tracker:
 		else:
 			self.PLAYER_ICONS[player].update(icons)
 
-		with open('icons.json', 'w') as icons_file:
+	def save_icons(self):
+		if not os.path.isdir('data'):
+			os.mkdir('data')
+
+		with open('data/icons.json', 'w') as icons_file:
 			json.dump(self.PLAYER_ICONS, icons_file)
 
 	def get_roles(self):
@@ -252,7 +280,7 @@ class Tracker:
 
 		ENDPOINT = 'roles'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False)
 
 		if not data.ok:
 			return None, None
@@ -264,48 +292,34 @@ class Tracker:
 		for role in data['roles']:
 			role['id'] = role['id'].replace('random-village', 'random-villager')
 
-			if role['id'] == 'random-other':
-				role['name'] = 'RO'
-
-			if role['name'] == 'Random regular villager':
+			if role['id'] == 'random-villager-normal':
 				role['name'] = 'RRV'
 
-			elif role['name'] == 'Random strong villager':
+			elif role['id'] == 'random-villager-strong':
 				role['name'] = 'RSV'
 
-			elif role['name'] == 'Random werewolf':
+			elif role['id'] == 'random-werewolf':
 				role['name'] = 'RW'
 
-			elif role['name'] == 'Random killer':
+			elif role['id'] == 'random-killer':
 				role['name'] = 'RK'
 
-			elif role['name'] == 'Random voting':
+			elif role['name'] == 'random-voting':
 				role['name'] = 'RV'
 
-			elif role['name'] == 'Random other':
-				role['name'] = 'RO'
-
-			if role['team'] == 'VILLAGER':
+			if role['team'] in ['VILLAGER', 'RANDOM_VILLAGER']:
 				role['team'] = 'VILLAGER'
 
-			elif role['team'] == 'WEREWOLF':
-				role['team'] = 'WEREWOLF'
-
-			elif role['team'] == 'RANDOM_VILLAGER':
-				role['team'] = 'VILLAGER'
-
-			elif role['team'] == 'RANDOM_WEREWOLF':
+			elif role['team'] == ['WEREWOLF', 'RANDOM_WEREWOLF']:
 				role['team'] = 'WEREWOLF'
 
 			else:
 				role['team'] = 'SOLO'
 
-			role['team'] = role['team'].replace('_', ' ')
-
 			roles[role['id']] = {
+				'name': role['name'],
 				'team': role['team'],
-				'aura': role['aura'],
-				'name': role['name']
+				'aura': role['aura']
 			}
 
 			role.pop('id')
@@ -314,19 +328,11 @@ class Tracker:
 
 		roles['red-lady'] = roles.pop('harlot')
 
-		roles['rainmaker'] = {
+		roles['random-villager-support'] = {
 			'team': 'VILLAGER',
 			'aura': 'GOOD',
-			'name': 'Rainmaker'
+			'name': 'RSPV'
 		}
-
-		roles['swamp-wolf'] = {
-			'team': 'WEREWOLF',
-			'aura': 'EVIL',
-			'name': 'Swamp wolf'
-		}
-
-		roles['random-other'] = roles.pop('random-others')
 
 		roles['random-werewolf-weak'] = {
 			'team': 'WEREWOLF',
@@ -338,6 +344,18 @@ class Tracker:
 			'team': 'WEREWOLF',
 			'aura': 'EVIL',
 			'name': 'RSW'
+		}
+
+		roles['random-support-werewolf'] = {
+			'team': 'WEREWOLF',
+			'aura': 'EVIL',
+			'name': 'RSPW'
+		}
+
+		roles['random-other'] = {
+			'team': 'VILLAGER',
+			'aura': 'GOOD',
+			'name': 'RO'
 		}
 
 		advanced_roles = data['advancedRolesMapping']
@@ -353,7 +371,7 @@ class Tracker:
 
 		ENDPOINT = 'items/roleIcons'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False)
 
 		if not data.ok:
 			return
@@ -375,7 +393,7 @@ class Tracker:
 
 		ENDPOINT = 'roleRotations'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False).json()
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False).json()
 
 		rotations = {}
 
@@ -422,7 +440,7 @@ class Tracker:
 	def get_player(self, username):
 		ENDPOINT = f'players/search?username={username}'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False)
 
 		if not data.ok:
 			return data.status_code, data.text
@@ -448,6 +466,8 @@ class Tracker:
 
 			if 'roleId2' in card:
 				cards[card['roleId1']] = card['roleId2']
+
+		time.sleep(0.1)
 
 		ENDPOINT = f'playerRoleStats/achievements/{player_id}'
 
@@ -521,7 +541,7 @@ class Tracker:
 			return
 
 	def storm(self):
-		PLAYERS_OLD = copy.deepcopy(self.PLAYERS)
+		PLAYERS_OLD = deepcopy(self.PLAYERS)
 
 		self.PLAYERS = []
 
@@ -551,7 +571,7 @@ class Tracker:
 
 		self.last_message_number = 0
 
-	def set_name(self, player, name):
+	def set_name(self, player, name, threaded=False):
 		data = self.get_player(name)
 
 		if data[0] == 404:
@@ -583,6 +603,10 @@ class Tracker:
 
 					break
 
+		if not threaded:
+			self.save_cards()
+			self.save_icons()
+
 	def set_role(self, player, role):
 		for r in range(len(self.ROTATION)):
 			if role.lower() == self.ROTATION[r]['name'].lower():
@@ -607,9 +631,11 @@ class Tracker:
 							break
 
 					self.write_cards(name, {src_role: self.ROTATION[r]['id']})
+					self.save_cards()
 
 				if self.ROTATION[r]['id'] in self.ROTATION_ICONS:
 					self.write_icons(name, {self.ROTATION[r]['id']: self.ROTATION_ICONS[self.ROTATION[r]['id']]})
+					self.save_icons()
 
 				break
 
@@ -627,7 +653,7 @@ class Tracker:
 				break
 
 		else:
-			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect dst role!{Back.RESET}')
+			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect destination role!{Back.RESET}')
 
 			return
 
@@ -641,7 +667,7 @@ class Tracker:
 				break
 
 		else:
-			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect src role!{Back.RESET}')
+			input(f'\n{Style.BRIGHT}{Back.RED}Incorrect source role!{Back.RESET}')
 
 			return
 
@@ -660,6 +686,8 @@ class Tracker:
 					})
 
 				break
+
+		self.save_cards()
 
 	def set_cursed(self):
 		for r, role in enumerate(self.ROTATION):
@@ -779,7 +807,7 @@ class Tracker:
 			for r in range(len(roles)):
 				flatten_rotations[t][r] = flatten_rotations[t][r][0]
 
-		rotations = copy.deepcopy(flatten_rotations)
+		rotations = deepcopy(flatten_rotations)
 
 		matches = [0 for _ in range(len(rotations))]
 
@@ -821,7 +849,7 @@ class Tracker:
 
 	def get_bearer(self):
 		self.BEARER_TOKEN = self.page.evaluate('() => JSON.parse(localStorage.getItem("authtokens"))["idToken"]')
-		self.CF_JWT = self.page.evaluate('() => JSON.parse(localStorage.getItem("cloudflare-turnstile-jwt"))')
+		self.CF_JWT = self.page.evaluate('() => localStorage.getItem("cloudflare-turnstile-jwt")')
 
 		self.BEARER_HEADERS = {
 			'Authorization': f'Bearer {self.BEARER_TOKEN}',
@@ -830,6 +858,8 @@ class Tracker:
 		}
 
 	def update_players(self):
+		updates = 0
+
 		service_messages = []
 		player_messages = []
 
@@ -866,6 +896,9 @@ class Tracker:
 			except:
 				continue
 
+		if len(service_messages):
+			self.PREV_PLAYERS = deepcopy(self.PLAYERS)
+
 		for service_message in service_messages:
 			player = None
 			number = None
@@ -879,7 +912,20 @@ class Tracker:
 
 				elif 'воду' in service_message:
 					if 'себя' in service_message:
-						...
+						players = service_message.split(' кинул святую воду в ')
+
+						for p in range(2):
+							number = int(players[p].split(' ')[0]) - 1
+							name = players[p].split(' ')[1]	
+
+							if '/' in players[p]:
+								role = players[p].split(' / ')[1].split(')')[0]
+
+							self.set_name(number, name)
+							self.PLAYERS[number]['dead'] = p
+
+							if role:
+								self.set_role(number, role)
 
 					else:
 						players = service_message.split(' кинул святую воду и убил ')
@@ -888,7 +934,7 @@ class Tracker:
 							number = int(players[p].split(' ')[0]) - 1
 							name = players[p].split(' ')[1]	
 
-							if '/' in service_message:
+							if '/' in players[p]:
 								role = players[p].split(' / ')[1].split(')')[0]
 
 							self.set_name(number, name)
@@ -906,7 +952,7 @@ class Tracker:
 						number = int(players[p].split(' ')[0]) - 1
 						name = players[p].split(' ')[1]	
 
-						if '/' in service_message:
+						if '/' in players[p]:
 							role = players[p].split(' / ')[1].split(')')[0]
 
 						self.set_name(number, name)
@@ -924,7 +970,7 @@ class Tracker:
 						number = int(players[p].split(' ')[0]) - 1
 						name = players[p].split(' ')[1]	
 
-						if '/' in service_message:
+						if '/' in players[p]:
 							role = players[p].split(' / ')[1].split(')')[0]
 
 						self.set_name(number, name)
@@ -970,7 +1016,7 @@ class Tracker:
 						number = int(players[p].split(' ')[0]) - 1
 						name = players[p].split(' ')[1]	
 
-						if '/' in service_message:
+						if '/' in players[p]:
 							role = players[p].split(' / ')[1].split(')')[0]
 
 						self.set_name(number, name)
@@ -1013,6 +1059,9 @@ class Tracker:
 
 			elif 'связал' in service_message:
 				player = service_message.split('Роль ')[1].split(' была ')[0]
+
+			elif 'отравлен' in service_message:
+				player = service_message.split(' отравлен ')[0]
 
 			elif 'мэр!' in service_message:
 				player = service_message.split('Игрок ')[1].split(' - ')[0]
@@ -1087,6 +1136,7 @@ class Tracker:
 			name = player.split(' ')[1]
 
 			self.PLAYERS[number]['messages'].append(message)
+			self.PREV_PLAYERS[number]['messages'].append(message)
 
 			number = ''
 
@@ -1097,21 +1147,31 @@ class Tracker:
 				elif number:
 					if int(number) in range(1, 17):
 						self.PLAYERS[int(number) - 1]['mentions'].append(message)
+						self.PREV_PLAYERS[int(number) - 1]['mentions'].append(message)
 
 					number = ''
 
 		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
 
-	def find_players(self):
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
+	def set_players_range(self, number=0, start=0, end=16):
+		for player in self.PLAYER_LAYERS[start:end]:
+			self.set_name(player['number'], player['name'], threaded=True)
 
-		layers = []
+		if not number:
+			self.DISCOVERED = [True, True]
+
+		else:
+			self.DISCOVERED[number - 1] = True
+
+	def find_players(self):
+		self.DISCOVERED = [False, False]
+		self.PLAYER_LAYERS = []
+
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Finding players...')
 
 		for i in range(1, 5):
 			for j in range(1, 5):
 				try:
-					time.sleep(0.5)
-
 					number = 4 * (i - 1) + j - 1
 
 					player_layer_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
@@ -1119,19 +1179,31 @@ class Tracker:
 					name_locator = player_base_locator.locator('xpath=/div[1]/div/div[4]/div/div')
 					name = name_locator.text_content(timeout=1000).split(' ')[1]
 
-					self.set_name(number, name)
-
-					layers.append({
+					self.PLAYER_LAYERS.append({
 						'number': number,
+						'name': name,
 						'locator': player_layer_locator
 					})
+
+					time.sleep(0.1)
 				except PlaywrightTimeoutError:
 					continue
 
-		for layer in layers:
+		if len(self.API_KEYS) >= 2:
+			threading.Thread(target=self.set_players_range, args=(1, 0, 8), daemon=True).start()
+			threading.Thread(target=self.set_players_range, args=(2, 8, 16), daemon=True).start()
+
+		else:
+			find_players_range()
+
+		while not all(self.DISCOVERED):
+			time.sleep(1)
+
+		for layer in self.PLAYER_LAYERS:
 			self.load_see(layer['number'], layer['locator'])
 
 		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
+		self.save_cards()
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Players found!')
 
@@ -1371,23 +1443,23 @@ class Tracker:
 					player_icon = icons.get(role['id'])
 					role_icon = self.ROTATION_ICONS.get(role['id'])
 
-					base_test = all([
+					base_test = [
 						role['team'] not in teams_exclude,
 						not team or team == role['team'],
 						not aura or aura == role['aura'],
 						self.ROLES[role['id']]['name'] in remaining[role['aura']]
-					])
+					]
 
-					role_test = all([
+					role_test = [
 						role['id'] in cards,
 						not player_icon or player_icon == role_icon
-					])
+					]
 
-					if base_test and role_test:
+					if all(base_test) and all(role_test):
 						possible.append({
 							'role': self.ROLES[role['id']]['name'],
 							'has_card': role['id'] in cards,
-							'has_icon': bool(player_icon)
+							'has_icon': player_icon == role_icon
 						})
 
 			info = f'{i + 1}'
@@ -1531,6 +1603,9 @@ class Tracker:
 		elif cmd.lower() == 'storm':
 			self.storm()
 
+		elif cmd.lower() == 'undo':
+			self.PLAYERS = deepcopy(self.PREV_PLAYERS)
+
 		else:
 			try:
 				player, info = cmd.lower().split(' is ')
@@ -1544,7 +1619,8 @@ class Tracker:
 				print(f'{Style.BRIGHT}{Fore.RED}Clear [number] [all / name / team / aura / equal]')
 				print(f'{Style.BRIGHT}{Fore.RED}Storm to rediscover')
 				print(f'{Style.BRIGHT}{Fore.RED}Enter to update')
-				print(f'{Style.BRIGHT}{Fore.RED}end - stop Tracker')
+				print(f'{Style.BRIGHT}{Fore.RED}Undo to cancel role updates')
+				print(f'{Style.BRIGHT}{Fore.RED}End - stop Tracker')
 				input()
 
 				return
@@ -1637,10 +1713,11 @@ class Tracker:
 						self.update_players()
 		except KeyboardInterrupt:
 			return
-		except Exception as e:
+		except KeyboardInterrupt as e:
 			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
 
 			return
+
 
 class Grinder:
 	def __init__(self):
@@ -2009,6 +2086,21 @@ class Grinder:
 
 
 class Miner:
+	def __init__(self):
+		self.config = dotenv_values('.env')
+
+		try:
+			self.BLUESTACKS5_PATH = self.config['BLUESTACKS5_PATH']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 not found!{Back.RESET}')
+
+			os.abort()
+
+		if not os.path.isfile(self.BLUESTACKS5_PATH):
+			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 is invalid!{Back.RESET}')
+
+			os.abort()
+
 	@staticmethod
 	def wait(filename, confidence=0.9, check_fail=False, check_count=7, click=True):
 		fails = 0
@@ -2032,15 +2124,6 @@ class Miner:
 				return 1
 
 			time.sleep(5)
-
-	@staticmethod
-	def launch_emulator():
-		pyautogui.press('win')
-
-		time.sleep(1)
-
-		pyautogui.write('bluestacks 5', interval=0.2)
-		pyautogui.press('enter')
 
 	@staticmethod
 	def open_wheel():
@@ -2125,11 +2208,7 @@ class Miner:
 	def run(self):
 		banner(self.__class__.__name__)
 
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Launching BlueStacks 5...')
-
-		self.launch_emulator()
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}BlueStacks 5 launched!')
+		subprocess.Popen(self.BLUESTACKS5_PATH, stdout=subprocess.PIPE)
 
 		try:
 			while True:
@@ -2150,25 +2229,23 @@ class Miner:
 
 			return
 
+
 class Stalker:
 	def __init__(self):
 		self.config = dotenv_values('.env')
 
 		try:
-			self.API_KEY = self.config['API_KEY']
+			self.API_KEYS = self.config['API_KEYS'].split(',')
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}API key not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}API key(s) not found!{Back.RESET}')
 
 			os.abort()
 
-		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
-		self.TARGETS = {}
+		self.API_KEY = self.switch_api_key()
 
-		self.BOT_HEADERS = {
-			'Authorization': f'Bot {self.API_KEY}',
-			'Accept': 'application/json',
-			'Content-Type': 'application/json'
-		}
+		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
+
+		self.TARGETS = {}
 
 		self.load_targets()
 		
@@ -2184,14 +2261,32 @@ class Stalker:
 
 		return f'{hours}:{minutes}'
 
+	@property
+	def bot_headers(self):
+		api_key = next(self.API_KEY)
+
+		return {
+			'Authorization': f'Bot {api_key}',
+			'Accept': 'application/json',
+			'Content-Type': 'application/json'
+		}
+
+	def switch_api_key(self):
+		while True:
+			for key in self.API_KEYS:
+				yield key
+
 	def load_targets(self):
 		try:
-			with open('targets.json', 'r', encoding='utf-8') as targets_file:
+			with open('data/targets.json', 'r', encoding='utf-8') as targets_file:
 				self.TARGETS = json.load(targets_file)
 		except:
 			self.TARGETS = {}
 
 	def write_target(self, target_id, info=None):
+		if not os.path.isdir('targets'):
+			os.mkdir('targets')
+
 		if info is None:
 			self.TARGETS.pop(target_id)
 
@@ -2204,7 +2299,7 @@ class Stalker:
 			if len(self.TARGETS[target_id]) == 3:
 				self.TARGETS[target_id].pop(0)
 
-		with open('targets.json', 'w', encoding='utf-8') as targets_file:
+		with open('data/targets.json', 'w', encoding='utf-8') as targets_file:
 			json.dump(self.TARGETS, targets_file, ensure_ascii=False)
 
 	@staticmethod
@@ -2249,8 +2344,8 @@ class Stalker:
 		if not all([prev_target, target]):
 			return
 
-		d1 = copy.deepcopy(prev_target)
-		d2 = copy.deepcopy(target)
+		d1 = deepcopy(prev_target)
+		d2 = deepcopy(target)
 
 		clan1 = d1.pop('clan').items()
 		clan2 = d2.pop('clan').items()
@@ -2272,7 +2367,7 @@ class Stalker:
 	def get_clan(self, clan_id):
 		ENDPOINT = f'clans/{clan_id}/info'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False)
 
 		if not data.ok:
 			return data.status_code, data.text
@@ -2304,7 +2399,7 @@ class Stalker:
 
 		ENDPOINT = f'clans/{clan_id}/members'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False)
 
 		if not data.ok:
 			return data.status_code, data.text
@@ -2330,7 +2425,7 @@ class Stalker:
 	def get_player_id(self, username):
 		ENDPOINT = f'players/search?username={username}'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False)
 
 		if not data.ok:
 			return data.status_code, data.text
@@ -2342,7 +2437,7 @@ class Stalker:
 	def get_player(self, player_id):
 		ENDPOINT = f'players/{player_id}'
 
-		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.BOT_HEADERS, verify=False)
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False)
 
 		if not data.ok:
 			return data.status_code, data.text
@@ -2465,8 +2560,8 @@ class Stalker:
 			time.sleep(0.1)
 
 		for i, target in enumerate(self.TARGETS.values()):
-			prev_target = copy.deepcopy(target[0]) if len(target) == 2 else {}
-			target = copy.deepcopy(target[-1])
+			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
+			target = deepcopy(target[-1])
 
 			changes = self.get_changes(prev_target, target)
 
@@ -2483,8 +2578,8 @@ class Stalker:
 		targets_info = ''
 
 		for i, target in enumerate(self.TARGETS.values()):
-			prev_target = copy.deepcopy(target[0]) if len(target) == 2 else {}
-			target = copy.deepcopy(target[-1])
+			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
+			target = deepcopy(target[-1])
 
 			changes = self.get_changes(prev_target, target)
 
@@ -2581,10 +2676,10 @@ class Stalker:
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Usage:')
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Add [IN-GAME NAME]')
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Delete [ID]')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}U - update all')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}U [ID] - update chosen player')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Enter - refresh')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}end - stop Stalker')
+			print(f'{Style.BRIGHT}{Fore.RED}Update - update all players')
+			print(f'{Style.BRIGHT}{Fore.RED}Update [ID] - update chosen player')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Enter to refresh')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}End - stop Stalker')
 			print()
 
 	def process(self):
@@ -2596,7 +2691,7 @@ class Stalker:
 		elif cmd.lower() == 'end':
 			return 1
 
-		elif cmd.lower() == 'u':
+		elif cmd.lower() == 'update':
 			self.update_targets()
 
 		else:
@@ -2606,10 +2701,10 @@ class Stalker:
 				print(f'\n{Style.BRIGHT}{Fore.RED}Usage:')
 				print(f'{Style.BRIGHT}{Fore.RED}Add [IN-GAME NAME]')
 				print(f'{Style.BRIGHT}{Fore.RED}Delete [ID]')
-				print(f'{Style.BRIGHT}{Fore.RED}U - update all')
-				print(f'{Style.BRIGHT}{Fore.RED}U [ID] - update chosen player')
-				print(f'{Style.BRIGHT}{Fore.RED}Enter - refresh')
-				print(f'{Style.BRIGHT}{Fore.RED}end - stop Stalker')
+				print(f'{Style.BRIGHT}{Fore.RED}Update - update all players')
+				print(f'{Style.BRIGHT}{Fore.RED}Update [ID] - update chosen player')
+				print(f'{Style.BRIGHT}{Fore.RED}Enter to refresh')
+				print(f'{Style.BRIGHT}{Fore.RED}End - stop Stalker')
 				input()
 
 				return
@@ -2662,7 +2757,7 @@ class Stalker:
 				except (ValueError, IndexError):
 					input(f'\n{Style.BRIGHT}{Back.RED}Invalid ID!{Back.RESET}')
 
-			elif cmd.lower() == 'u':
+			elif cmd.lower() == 'update':
 				try:
 					target = int(target) - 1
 
@@ -2732,7 +2827,6 @@ def run():
 			print(f'\n{Style.BRIGHT}{Back.RED}Incorrect choice!{Back.RESET}')
 
 		module.run()
-
 
 try:
 	run()

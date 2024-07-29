@@ -152,7 +152,5 @@ cython_debug/
 .idea/
 
 # Players data
-cards.json
-icons.json
-targets.json
+data/
 targets/
