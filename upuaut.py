@@ -1,6 +1,9 @@
 import requests
 import threading
 import pyautogui
+import pygetwindow
+import psutil
+import ntplib
 import copy
 import json
 import os
@@ -15,8 +18,6 @@ from dotenv import dotenv_values
 init(autoreset=True)
 
 requests.packages.urllib3.disable_warnings()
-
-updating = False
 
 
 class Tracker:
@@ -63,6 +64,52 @@ class Tracker:
 		self.ROLES = []
 		self.ADVANCED_ROLES = {}
 
+		self.RANDOM_ROLE_TYPES = {
+			'random-villager-normal': [
+				'aura-seer',
+				'beast-hunter',
+				'bodyguard',
+				'doctor',
+				'flower-child',
+				'loudmouth',
+				'mayor',
+				'priest',
+				'red-lady',
+				'sheriff',
+				'witch'
+			],
+			'random-villager-strong': [
+				'detective',
+				'jailer',
+				'medium',
+				'seer',
+				'vigilante'
+			],
+			'random-villager-support': [
+				'doctor',
+				'bodyguard',
+				'ghost-lady',
+				'sheriff',
+				'beast-hunter',
+				'bellringer'
+			],
+			'random-werewolf-weak': 'WEREWOLF',
+			'random-werewolf-strong': 'WEREWOLF',
+			'random-support-werewolf': [
+				'nightmare-werewolf',
+				'wolf-shaman',
+				'toxic-wolf'
+			],
+			'random-killer': [
+				'arsonist',
+				'bandit',
+				'corruptor',
+				'serial-killer'
+			],
+			'random-voting': ['fool'],
+			'random-other': ['cupid', 'cursed']
+		}
+
 		self.ROTATION_ICONS = {}
 
 		self.PLAYER_CARDS = {}
@@ -83,14 +130,12 @@ class Tracker:
 				'mentions': []
 			})
 
-		self.PREV_PLAYERS = deepcopy(self.PLAYERS)
-
 		self.DISCOVERED = [False, False]
 		self.PLAYER_LAYERS = []
 
 		self.BEARER_HEADERS = {}
 
-		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\WolvesGod'
+		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\Upuaut'
 		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 
 		self.page = None
@@ -524,11 +569,18 @@ class Tracker:
 		elif info == 'name':
 			self.PLAYERS[player]['name'] = None
 
+		elif info == 'role':
+			self.PLAYERS[player]['role'] = None
+			self.PLAYERS[player]['team'] = None
+			self.PLAYERS[player]['aura'] = None
+
 		elif info == 'team':
+			self.PLAYERS[player]['role'] = None
 			self.PLAYERS[player]['team'] = None
 			self.PLAYERS[player]['teams_exclude'] = set()
 
 		elif info == 'aura':
+			self.PLAYERS[player]['role'] = None
 			self.PLAYERS[player]['aura'] = None
 
 		elif info == 'equal':
@@ -571,6 +623,18 @@ class Tracker:
 
 		self.last_message_number = 0
 
+	def revert(self, action):
+		if not self.PREV_PLAYERS:
+			input(f'\n{Style.BRIGHT}{Back.RED}Last revert reached!{Back.RESET}')
+
+		else:
+			self.PLAYERS = deepcopy(self.PREV_PLAYERS[-1])
+
+			if action:
+				self.PREV_PLAYERS.pop()
+
+		return -1
+
 	def set_name(self, player, name, threaded=False):
 		data = self.get_player(name)
 
@@ -610,37 +674,71 @@ class Tracker:
 	def set_role(self, player, role):
 		for r in range(len(self.ROTATION)):
 			if role.lower() == self.ROTATION[r]['name'].lower():
-				name = self.PLAYERS[player]['name']
+				break
 
-				self.PLAYERS[player]['role'] = self.ROTATION[r]['id']
-				self.PLAYERS[player]['team'] = self.ROTATION[r]['team']
-				self.PLAYERS[player]['aura'] = self.ROTATION[r]['aura']
+			elif self.ROTATION[r]['id'] in self.RANDOM_ROLE_TYPES:
+				type_roles = self.RANDOM_ROLE_TYPES[self.ROTATION[r]['id']]
+				dst_role = None
 
-				for equal_player in self.PLAYERS[player]['equal']:
-					self.PLAYERS[equal_player]['team'] = self.PLAYERS[player]['team']
+				if type(type_roles) == str:
+					for role1 in self.ROLES:
+						if role.lower() == self.ROLES[role1]['name'].lower():
+							if self.ROLES[role1]['team'] == type_roles:
+								dst_role = self.ROLES[role1]
 
-				for not_equal_player in self.PLAYERS[player]['not_equal']:
-					self.PLAYERS[not_equal_player]['teams_exclude'].add(self.PLAYERS[player]['team'])
-
-				if self.PLAYERS[player]['hero']:
-					break
-
-				if name and self.ROTATION[r]['id'] not in self.ADVANCED_ROLES:
-					for src_role in self.ADVANCED_ROLES:
-						if self.ROTATION[r]['id'] in self.ADVANCED_ROLES[src_role]:
 							break
 
-					self.write_cards(name, {src_role: self.ROTATION[r]['id']})
-					self.save_cards()
+				else:
+					for random_role in type_roles:
+						if role.lower() == self.ROLES[random_role]['name'].lower():
+							dst_role = self.ROLES[random_role]
 
-				if self.ROTATION[r]['id'] in self.ROTATION_ICONS:
-					self.write_icons(name, {self.ROTATION[r]['id']: self.ROTATION_ICONS[self.ROTATION[r]['id']]})
-					self.save_icons()
+							break
 
-				break
+						elif random_role in self.ADVANCED_ROLES:
+							for advanced_role in self.ADVANCED_ROLES[random_role]:
+								if role.lower() == self.ROLES[advanced_role]['name'].lower():
+									dst_role = self.ROLES[advanced_role]
+
+									break
+
+							if dst_role:
+								break
+
+				if dst_role:
+					self.change_role(self.ROTATION[r]['name'], dst_role['name'])
+
+					break
 
 		else:
 			return 1
+
+		self.PLAYERS[player]['role'] = self.ROTATION[r]['id']
+		self.PLAYERS[player]['team'] = self.ROTATION[r]['team']
+		self.PLAYERS[player]['aura'] = self.ROTATION[r]['aura']
+
+		for equal_player in self.PLAYERS[player]['equal']:
+			self.PLAYERS[equal_player]['team'] = self.PLAYERS[player]['team']
+
+		for not_equal_player in self.PLAYERS[player]['not_equal']:
+			self.PLAYERS[not_equal_player]['teams_exclude'].add(self.PLAYERS[player]['team'])
+
+		if self.PLAYERS[player]['hero'] or self.ROTATION[r]['id'] == 'zombie':
+			return
+
+		name = self.PLAYERS[player]['name']
+
+		if name and self.ROTATION[r]['id'] not in self.ADVANCED_ROLES:
+			for src_role in self.ADVANCED_ROLES:
+				if self.ROTATION[r]['id'] in self.ADVANCED_ROLES[src_role]:
+					break
+
+			self.write_cards(name, {src_role: self.ROTATION[r]['id']})
+			self.save_cards()
+
+		if self.ROTATION[r]['id'] in self.ROTATION_ICONS:
+			self.write_icons(name, {self.ROTATION[r]['id']: self.ROTATION_ICONS[self.ROTATION[r]['id']]})
+			self.save_icons()
 
 	def change_role(self, src_role, dst_role):
 		is_random = False
@@ -897,7 +995,10 @@ class Tracker:
 				continue
 
 		if len(service_messages):
-			self.PREV_PLAYERS = deepcopy(self.PLAYERS)
+			if len(self.PREV_PLAYERS) == 3:
+				self.PREV_PLAYERS.pop(0)
+
+			self.PREV_PLAYERS.append(deepcopy(self.PLAYERS))
 
 		for service_message in service_messages:
 			player = None
@@ -922,7 +1023,7 @@ class Tracker:
 								role = players[p].split(' / ')[1].split(')')[0]
 
 							self.set_name(number, name)
-							self.PLAYERS[number]['dead'] = p
+							self.PLAYERS[number]['dead'] = not p
 
 							if role:
 								self.set_role(number, role)
@@ -1071,6 +1172,14 @@ class Tracker:
 				role = 'Mayor'
 				dead = False
 
+			elif 'проповедник!' in service_message:
+				player = service_message.split('Игрок ')[1].split(' - ')[0]
+
+				number, name = player.split(' ')
+				number = int(number) - 1
+				role = 'Preacher'
+				dead = False
+
 			elif 'воскресил' in service_message:
 				player = service_message.split(' воскресил ')[1].replace('.', '')
 
@@ -1136,7 +1245,9 @@ class Tracker:
 			name = player.split(' ')[1]
 
 			self.PLAYERS[number]['messages'].append(message)
-			self.PREV_PLAYERS[number]['messages'].append(message)
+
+			for pp in range(len(self.PREV_PLAYERS)):
+				self.PREV_PLAYERS[pp][number]['messages'].append(message)
 
 			number = ''
 
@@ -1147,7 +1258,9 @@ class Tracker:
 				elif number:
 					if int(number) in range(1, 17):
 						self.PLAYERS[int(number) - 1]['mentions'].append(message)
-						self.PREV_PLAYERS[int(number) - 1]['mentions'].append(message)
+
+						for pp in range(len(self.PREV_PLAYERS)):
+							self.PREV_PLAYERS[pp][int(number) - 1]['mentions'].append(message)
 
 					number = ''
 
@@ -1202,6 +1315,7 @@ class Tracker:
 		for layer in self.PLAYER_LAYERS:
 			self.load_see(layer['number'], layer['locator'])
 
+		self.PREV_PLAYERS = [deepcopy(self.PLAYERS)]
 		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
 		self.save_cards()
 
@@ -1276,7 +1390,7 @@ class Tracker:
 					role = 'nightmare-werewolf'
 
 				for _ in range(2):
-					if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
+					if role in self.ROLES:
 						break
 
 					role = role[role.find('-') + 1:]
@@ -1339,7 +1453,7 @@ class Tracker:
 					role = 'nightmare-werewolf'
 
 				for _ in range(2):
-					if role in list(self.ROLES) + self.ADVANCED_ROLES.get(role, []):
+					if role in self.ROLES:
 						break
 
 					role = role[role.find('-') + 1:]
@@ -1603,8 +1717,10 @@ class Tracker:
 		elif cmd.lower() == 'storm':
 			self.storm()
 
-		elif cmd.lower() == 'undo':
-			self.PLAYERS = deepcopy(self.PREV_PLAYERS)
+		elif cmd.lower() in ['undo', 'redo']:
+			self.revert(cmd.lower() == 'undo')
+
+			return -1
 
 		else:
 			try:
@@ -1616,10 +1732,11 @@ class Tracker:
 				print(f'{Style.BRIGHT}{Fore.RED}Name of [number] is [name]')
 				print(f'{Style.BRIGHT}{Fore.RED}Change [role] to [role]')
 				print(f'{Style.BRIGHT}{Fore.RED}Cursed turned')
-				print(f'{Style.BRIGHT}{Fore.RED}Clear [number] [all / name / team / aura / equal]')
+				print(f'{Style.BRIGHT}{Fore.RED}Clear [number] [all / name / role / team / aura / equal]')
 				print(f'{Style.BRIGHT}{Fore.RED}Storm to rediscover')
 				print(f'{Style.BRIGHT}{Fore.RED}Enter to update')
 				print(f'{Style.BRIGHT}{Fore.RED}Undo to cancel role updates')
+				print(f'{Style.BRIGHT}{Fore.RED}Redo to return role updates')
 				print(f'{Style.BRIGHT}{Fore.RED}End - stop Tracker')
 				input()
 
@@ -1707,10 +1824,13 @@ class Tracker:
 					while True:
 						self.monitor()
 
-						if self.process():
+						result = self.process()
+
+						if result == 1:
 							break
 
-						self.update_players()
+						if not result:
+							self.update_players()
 		except KeyboardInterrupt:
 			return
 		except KeyboardInterrupt as e:
@@ -1719,7 +1839,7 @@ class Tracker:
 			return
 
 
-class Grinder:
+class Booster:
 	def __init__(self):
 		self.config = dotenv_values('.env')
 
@@ -1730,9 +1850,8 @@ class Grinder:
 
 			os.abort()
 
-		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\WolvesGod'
+		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\Upuaut'
 		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-		self.USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 		self.page = None
 
 	def act_villager(self):
@@ -2085,7 +2204,7 @@ class Grinder:
 			return
 
 
-class Miner:
+class Spinner:
 	def __init__(self):
 		self.config = dotenv_values('.env')
 
@@ -2101,12 +2220,19 @@ class Miner:
 
 			os.abort()
 
+		try:
+			self.BLUESTACKS5_NAME = self.config['BLUESTACKS5_NAME']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window not found!{Back.RESET}')
+
+			os.abort()
+
 	@staticmethod
 	def wait(filename, confidence=0.9, check_fail=False, check_count=7, click=True):
 		fails = 0
 
 		while True:
-			coords = pyautogui.locateCenterOnScreen('img/' + filename, confidence=confidence)
+			coords = pyautogui.locateCenterOnScreen('images/' + filename, confidence=confidence)
 
 			if coords:
 				if click:
@@ -2130,16 +2256,19 @@ class Miner:
 		time.sleep(1)
 
 		while True:
-			header = pyautogui.locateCenterOnScreen('img/header.png', confidence=0.8)
+			header = pyautogui.locateCenterOnScreen('images/header.png', confidence=0.8)
 
 			if header:
 				break
 
 		pyautogui.click(header[0], header[1] + 35)
 
-	def shutdown(self):
-		self.wait('shutdown.png')
-		self.wait('confirm.png')
+	def kill(self):
+		for p in psutil.process_iter():
+		    if p.name() == 'HD-Player.exe':
+		        p.kill()
+
+		        return
 
 	def back(self):
 		self.wait('back.png')
@@ -2178,7 +2307,7 @@ class Miner:
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking spin button...')
 
 			if self.wait('spin.png', confidence=0.8, check_fail=True):
-				print(f'{Style.BRIGHT}{Fore.RED}Spin button not found.')
+				print(f'{Style.BRIGHT}{Fore.RED}Spin button not found.') 
 
 				return
 
@@ -2186,17 +2315,9 @@ class Miner:
 				print(f'{Style.BRIGHT}{Fore.GREEN}Spinned!')
 
 	def prepare(self):
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for BlueStacks 5...')
-
-		self.home()
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}BlueStacks 5 found!')
-
-		time.sleep(3)
-
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for game load...')
 
-		while self.wait('game_app_icon.png', check_fail=True):
+		while self.wait('game.png', check_fail=True):
 			self.home()
 
 		self.wait('profile.png', click=False)
@@ -2208,16 +2329,31 @@ class Miner:
 	def run(self):
 		banner(self.__class__.__name__)
 
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for BlueStacks 5...')
+
 		subprocess.Popen(self.BLUESTACKS5_PATH, stdout=subprocess.PIPE)
+
+		self.home()
+
+		print(f'{Style.BRIGHT}{Fore.GREEN}BlueStacks 5 found!')
+
+		try:
+			window = pygetwindow.getWindowsWithTitle(self.BLUESTACKS5_NAME)[0]
+			window.size = (540, 934)
+		except IndexError:
+			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window is invalid!{Back.RESET}')
+
+			os.abort()
 
 		try:
 			while True:
 				self.prepare()
 
 				if self.spin():
-					self.shutdown()
+					self.kill()
 
-					input(f'\n{Style.BRIGHT}{Fore.YELLOW}Press Enter to exit.{Fore.RESET}')
+					print(f'\n{Style.BRIGHT}{Fore.YELLOW}Press Enter to exit.{Fore.RESET}')
+					input()
 
 					return
 
@@ -2225,7 +2361,7 @@ class Miner:
 
 				self.close_all()
 		except KeyboardInterrupt:
-			self.shutdown()
+			self.kill()
 
 			return
 
@@ -2241,11 +2377,14 @@ class Stalker:
 
 			os.abort()
 
+		self.ntp = ntplib.NTPClient()
+		self.NTP_SERVER = 'pool.ntp.org'
+
 		self.API_KEY = self.switch_api_key()
 
 		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
-
 		self.TARGETS = {}
+		self.updating = False
 
 		self.load_targets()
 		
@@ -2302,8 +2441,12 @@ class Stalker:
 		with open('data/targets.json', 'w', encoding='utf-8') as targets_file:
 			json.dump(self.TARGETS, targets_file, ensure_ascii=False)
 
-	@staticmethod
-	def add_changes(prev_target, target, diff, clan=False):
+	def get_current_time(self):
+		data = self.ntp.request(self.NTP_SERVER)
+
+		return time.ctime(data.tx_time)
+
+	def add_changes(self, prev_target, target, diff, clan=False):
 		if not os.path.isdir('targets'):
 			os.mkdir('targets')
 
@@ -2313,26 +2456,33 @@ class Stalker:
 			target = target['clan']
 			prev_target = prev_target['clan']	
 
-		for d in diff:
-			if not target[d] or target[d] == -1:
-				target[d] = 'HIDDEN'
+		if diff:
+			with open(f'targets/{target_id}.txt', 'a', encoding='utf-8') as f:	
+				current_time = self.get_current_time()
 
-			if not prev_target[d] or prev_target[d] == -1:
-				prev_target[d] = 'HIDDEN'
+				f.write(f'{current_time}\n\n')
 
-			if target[d] == prev_target[d]:
-				continue
+				for d in diff:
+					if not target[d] or target[d] == -1:
+						target[d] = 'HIDDEN'
 
-			field = 'Clan ' if clan else ''
-			field += d.replace('_', ' ').capitalize()
+					if not prev_target[d] or prev_target[d] == -1:
+						prev_target[d] = 'HIDDEN'
 
-			with open(f'targets/{target_id}.txt', 'a', encoding='utf-8') as f:
-				prev_value = prev_target[d]
-				value = target[d]
+					if target[d] == prev_target[d]:
+						continue
 
-				change_info = f'{field}: {prev_value} -> {value}\n'
+					field = 'Clan ' if clan else ''
+					field += d.replace('_', ' ').capitalize()
 
-				f.write(change_info)
+					prev_value = prev_target[d]
+					value = target[d]
+
+					change_info = f'{field}: {prev_value} -> {value}\n'
+
+					f.write(change_info)
+
+				f.write('\n')
 
 	def auto_update(self):
 		while True:
@@ -2534,12 +2684,10 @@ class Stalker:
 		return 0, player_data
 
 	def update_targets(self, target_id=None):
-		global updating
-
-		if updating:
+		if self.updating:
 			return
 
-		updating = True
+		self.updating = True
 
 		if target_id:
 			targets = [target_id]
@@ -2570,7 +2718,7 @@ class Stalker:
 				
 				break
 
-		updating = False
+		self.updating = False
 
 	def monitor(self):
 		banner(self.__class__.__name__)
@@ -2676,8 +2824,8 @@ class Stalker:
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Usage:')
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Add [IN-GAME NAME]')
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Delete [ID]')
-			print(f'{Style.BRIGHT}{Fore.RED}Update - update all players')
-			print(f'{Style.BRIGHT}{Fore.RED}Update [ID] - update chosen player')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Update - update all players')
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Update [ID] - update chosen player')
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Enter to refresh')
 			print(f'{Style.BRIGHT}{Fore.YELLOW}End - stop Stalker')
 			print()
@@ -2791,10 +2939,25 @@ class Stalker:
 			return
 
 
+class Browser:
+	def run(self):
+		banner(self.__class__.__name__)
+
+		print(f'\n{Style.BRIGHT}{Fore.RED}Once the browser opens, open any request to Wolvesville.')
+		print(f'{Style.BRIGHT}{Fore.RED}Copy the "User-Agent" header and paste it into the environment file.')
+		print(f'{Style.BRIGHT}{Fore.RED}You can then close the browser and use the program.')
+		print(f'\n{Style.BRIGHT}{Fore.RED}Press Enter to continue.{Fore.RESET}')
+		input()
+
+		subprocess.Popen('start chrome --user-data-dir="%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Upuaut" wolvesville.com', shell=True)
+
+		os.abort()
+
+
 def banner(module=None):
 	os.system('cls')
 
-	message = f'{Style.BRIGHT}{Fore.RED}Wolves{Fore.YELLOW}GOD{Fore.RESET}'
+	message = f'{Style.BRIGHT}{Fore.RED}Upu{Fore.YELLOW}aut{Fore.RESET}'
 
 	if module:
 		message += f'{Fore.RED} | {module}'
@@ -2804,11 +2967,11 @@ def banner(module=None):
 	print(message)
 
 
-def run():
+try:
 	while True:
 		banner()
 
-		modules = [Tracker(), Grinder(), Miner(), Stalker()]
+		modules = [Tracker(), Booster(), Spinner(), Stalker(), Browser()]
 		module = None
 
 		for i, module in enumerate(modules):
@@ -2827,8 +2990,5 @@ def run():
 			print(f'\n{Style.BRIGHT}{Back.RED}Incorrect choice!{Back.RESET}')
 
 		module.run()
-
-try:
-	run()
 except KeyboardInterrupt:
 	pass

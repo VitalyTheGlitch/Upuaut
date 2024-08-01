@@ -2,5 +2,6 @@ colorama
 playsound
 playwright
 PyAutoGUI
+PyGetWindow
 python-dotenv
 requests
