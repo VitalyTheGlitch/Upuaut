@@ -355,7 +355,7 @@ class Tracker:
 			if role['team'] in ['VILLAGER', 'RANDOM_VILLAGER']:
 				role['team'] = 'VILLAGER'
 
-			elif role['team'] == ['WEREWOLF', 'RANDOM_WEREWOLF']:
+			elif role['team'] in ['WEREWOLF', 'RANDOM_WEREWOLF']:
 				role['team'] = 'WEREWOLF'
 
 			else:
@@ -401,6 +401,12 @@ class Tracker:
 			'team': 'VILLAGER',
 			'aura': 'GOOD',
 			'name': 'RO'
+		}
+
+		roles['blight'] = {
+			'team': 'SOLO',
+			'aura': 'UNKNOWN',
+			'name': 'Blight'
 		}
 
 		advanced_roles = data['advancedRolesMapping']
@@ -545,52 +551,6 @@ class Tracker:
 					break
 
 		return 0, cards, icons
-
-	def clear_player_info(self, player, info):
-		if info == 'all':
-			hero = self.PLAYERS[player]['hero']
-			messages = self.PLAYERS[player]['messages']
-			mentions = self.PLAYERS[player]['mentions']
-
-			self.PLAYERS[player] = {
-				'name': None,
-				'role': None,
-				'team': None,
-				'teams_exclude': set(),
-				'aura': None,
-				'dead': False,
-				'equal': set(),
-				'not_equal': set(),
-				'hero': hero,
-				'messages': messages,
-				'mentions': mentions
-			}
-
-		elif info == 'name':
-			self.PLAYERS[player]['name'] = None
-
-		elif info == 'role':
-			self.PLAYERS[player]['role'] = None
-			self.PLAYERS[player]['team'] = None
-			self.PLAYERS[player]['aura'] = None
-
-		elif info == 'team':
-			self.PLAYERS[player]['role'] = None
-			self.PLAYERS[player]['team'] = None
-			self.PLAYERS[player]['teams_exclude'] = set()
-
-		elif info == 'aura':
-			self.PLAYERS[player]['role'] = None
-			self.PLAYERS[player]['aura'] = None
-
-		elif info == 'equal':
-			self.PLAYERS[player]['equal'] = set()
-			self.PLAYERS[player]['not_equal'] = set()
-
-		else:
-			input(f'\n{Style.BRIGHT}{Back.RED}Invalid info!{Back.RESET}')
-
-			return
 
 	def storm(self):
 		PLAYERS_OLD = deepcopy(self.PLAYERS)
@@ -1700,16 +1660,17 @@ class Tracker:
 			self.set_cursed()
 
 		elif cmd.lower().startswith('clear '):
-			info = cmd.lower().split('clear ')[1].split(' ')
+			player = cmd.lower().split('clear ')[1]
 
-			if len(info) >= 1 and info[0].isdigit() and 1 <= int(info[0]) <= 16:
-				if len(info) == 1:
-					info.append('all')
+			if player.isdigit() and 1 <= int(player) <= 16:
+				player = int(player) - 1
 
-				player = int(info[0]) - 1
-				info = info[1]
-
-				self.clear_player_info(player, info)
+				self.PLAYERS[player]['role'] = None
+				self.PLAYERS[player]['team'] = None
+				self.PLAYERS[player]['teams_exclude'] = set()
+				self.PLAYERS[player]['aura'] = None
+				self.PLAYERS[player]['equal'] = set()
+				self.PLAYERS[player]['not_equal'] = set()
 
 			else:
 				input(f'\n{Style.BRIGHT}{Back.RED}Invalid info!{Back.RESET}')
