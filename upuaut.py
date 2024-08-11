@@ -1188,7 +1188,7 @@ class Tracker:
 					self.set_role(number, role)
 
 		for player_message in player_messages:
-			if 'Приватное' in player_message or 'Сбежавший' in player_message:
+			if 'Приватное' in player_message or 'Личное' in player_message or 'Сбежавший' in player_message:
 				continue
 
 			player_message = player_message.split(': ', 1)
