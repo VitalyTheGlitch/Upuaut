@@ -8,6 +8,8 @@ import copy
 import json
 import os
 import subprocess
+import dateutil
+import pytz
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from copy import deepcopy
@@ -2226,10 +2228,10 @@ class Spinner:
 
 	def kill(self):
 		for p in psutil.process_iter():
-		    if p.name() == 'HD-Player.exe':
-		        p.kill()
+			if p.name() == 'HD-Player.exe':
+				p.kill()
 
-		        return
+				return
 
 	def back(self):
 		self.wait('back.png')
@@ -2338,6 +2340,20 @@ class Stalker:
 
 			os.abort()
 
+		try:
+			TIMEZONE = self.config['TIMEZONE']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Timezone not found!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.TIMEZONE = pytz.timezone(TIMEZONE)
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Timezone is invalid!{Back.RESET}')
+
+			os.abort()
+
 		self.ntp = ntplib.NTPClient()
 		self.NTP_SERVER = 'pool.ntp.org'
 
@@ -2346,6 +2362,9 @@ class Stalker:
 		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
 		self.TARGETS = {}
 		self.updating = False
+
+		self.CLAN_CHANGES = set()
+		self.INFO_CHANGES = set()
 
 		self.load_targets()
 		
@@ -2370,6 +2389,16 @@ class Stalker:
 			'Accept': 'application/json',
 			'Content-Type': 'application/json'
 		}
+
+	def normalize_time(self, dt):
+		if not dt:
+			return ''
+
+		dt = dateutil.parser.parse(dt)
+		dt = dt.astimezone(self.TIMEZONE)
+		dt = dt.strftime('%Y.%m.%d %H:%M:%S')
+
+		return dt
 
 	def switch_api_key(self):
 		while True:
@@ -2492,12 +2521,9 @@ class Stalker:
 
 		name = data.get('name', {})
 		description = data.get('description')
-		created = data.get('creationTime', '').replace('T', ' ').replace('Z', '')
+		created = self.normalize_time(data.get('creationTime'))
 
-		if created:
-			created = created.split('.')[0]
-
-		xp = data.get('xp')
+		total_xp = data.get('xp')
 		language = data.get('language')
 		tag = data.get('tag')
 		member_count = data.get('memberCount')
@@ -2506,7 +2532,7 @@ class Stalker:
 			'name': name,
 			'description': description,
 			'created': created,
-			'xp': xp,
+			'total_xp': total_xp,
 			'language': language,
 			'tag': tag,
 			'member_count': member_count,
@@ -2527,10 +2553,7 @@ class Stalker:
 			player_xp = player.get('xp')
 			co_leader = player.get('isCoLeader')
 			flair = player.get('flair')
-			joined = player.get('creationTime', '').replace('T', ' ').replace('Z', '')
-
-			if joined:
-				joined = joined.split('.')[0]
+			joined = self.normalize_time(player.get('creationTime'))
 
 			clan_data['members'][player_id] = {
 				'player_xp': player_xp,
@@ -2584,15 +2607,8 @@ class Stalker:
 		elif status == 'OFFLINE':
 			status = '📵'
 
-		last_online = data.get('lastOnline', '').replace('T', ' ').replace('Z', '')
-
-		if last_online:
-			last_online = last_online.split('.')[0].replace('-', '.')
-
-		created = data.get('creationTime', '').replace('-', '.').replace('T', ' ').replace('Z', '')
-
-		if created:
-			created = created.split('.')[0].replace('-', '.')
+		last_online = self.normalize_time(data.get('lastOnline'))
+		created = self.normalize_time(data.get('creationTime'))
 
 		received_roses = data.get('receivedRosesCount')
 		sent_roses = data.get('sentRosesCount')
@@ -2676,6 +2692,20 @@ class Stalker:
 
 			time.sleep(0.1)
 
+		for i, target in enumerate(self.TARGETS.values()):
+			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
+			target = deepcopy(target[-1])
+
+			changes = self.get_changes(prev_target, target)
+
+			if changes:
+				self.CLAN_CHANGES.update(changes[0])
+				self.INFO_CHANGES.update(changes[1])
+
+				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
+				
+				break
+
 		self.updating = False
 
 	def monitor(self):
@@ -2687,23 +2717,22 @@ class Stalker:
 			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
 			target = deepcopy(target[-1])
 
-			changes = self.get_changes(prev_target, target)
+			for field in target:
+				if field == 'status':
+					continue
 
-			if changes:
-				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
+				if field in self.INFO_CHANGES:
+					target[field] = f'{Fore.GREEN}{target[field]}{Fore.RESET}'
 
-				clan_changes, info_changes = changes
+			for field in target['clan']:
+				if 'xp' in field and target['clan'][field]:
+					target['clan'][field] = str(target['clan'][field]) + 'xp'
 
-				for field in target:
-					if field == 'status':
-						continue
+				if field in self.CLAN_CHANGES:
+					target['clan'][field] = f'{Fore.GREEN}{target["clan"][field]}{Fore.RESET}'
 
-					if field in info_changes:
-						target[field] = f'{Fore.GREEN}{target[field]}{Fore.RESET}'
-
-				for field in target['clan']:
-					if field in clan_changes:
-						target['clan'][field] = f'{Fore.GREEN}{target["clan"][field]}{Fore.RESET}'
+			self.CLAN_CHANGES = set()
+			self.INFO_CHANGES = set()
 
 			player_id = target['id']
 			name = target['name']
@@ -2737,12 +2766,12 @@ class Stalker:
 			clan = target['clan']
 
 			tag = clan.get('tag', '')
-			language = clan.get('language')
-			xp = clan.get('player_xp')
-			player_xp = clan.get('xp')
-			flair = clan.get('flair')
-			co_leader = clan.get('co_leader')
-			joined = clan.get('joined')
+			language = clan.get('language', '?')
+			total_xp = clan.get('total_xp', '')
+			player_xp = clan.get('player_xp', '?')
+			flair = clan.get('flair', '')
+			co_leader = clan.get('co_leader', '')
+			joined = clan.get('joined', '')
 
 			if tag:
 				tag += ' |'
@@ -2751,17 +2780,10 @@ class Stalker:
 			info += f'{tag}{name} {level} {status} {last_online}\n'
 
 			if clan:
-				info += f'🏰  {player_xp}xp'
-
-				if flair:
-					info += f' ({flair})'
-				
-				if joined:
-					info += f' {joined}'
-
-				if co_leader:
-					info += ' CO-LEADER'
-
+				info += f'🏰  {player_xp}/{total_xp}'
+				info += f' ({flair})' if flair else ''
+				info += f' {joined}' if joined else ''
+				info += ' CO-LEADER' if co_leader else ''
 				info += f' {language}\n'
 
 			info += f'{bio}\n'
@@ -2903,10 +2925,10 @@ class Stalker:
 					break
 		except KeyboardInterrupt:
 			return
-		except Exception as e:
-			input(f'\n{Style.BRIGHT}{Back.RED}{str(e)}{Back.RESET}')
+		# except Exception as e:
+		# 	input(f'\n{Style.BRIGHT}{Back.RED}{str(e)}{Back.RESET}')
 
-			return
+		# 	return
 
 
 class Browser:
