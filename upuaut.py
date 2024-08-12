@@ -2527,7 +2527,10 @@ class Stalker:
 			player_xp = player.get('xp')
 			co_leader = player.get('isCoLeader')
 			flair = player.get('flair')
-			joined = player.get('creationTime', '').replace('T', ' ').replace('Z', '').split('.')[0]
+			joined = player.get('creationTime', '').replace('T', ' ').replace('Z', '')
+
+			if joined:
+				joined = joined.split('.')[0]
 
 			clan_data['members'][player_id] = {
 				'player_xp': player_xp,
@@ -2753,7 +2756,8 @@ class Stalker:
 				if flair:
 					info += f' ({flair})'
 				
-				info += f' {joined}'
+				if joined:
+					info += f' {joined}'
 
 				if co_leader:
 					info += ' CO-LEADER'
