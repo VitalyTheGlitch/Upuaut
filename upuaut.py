@@ -25,7 +25,7 @@ class Tracker:
 		self.config = dotenv_values('.env')
 
 		try:
-			self.API_KEYS = self.config['API_KEYS'].split(',')
+			self.API_KEYS = self.config['TRACKER_API_KEYS'].split(',')
 			self.USER_AGENT = self.config['USER_AGENT']
 		except KeyError:
 			input(f'{Style.BRIGHT}{Back.RED}API key(s) / User Agent not found!{Back.RESET}')
@@ -2332,7 +2332,7 @@ class Stalker:
 		self.config = dotenv_values('.env')
 
 		try:
-			self.API_KEYS = self.config['API_KEYS'].split(',')
+			self.API_KEYS = self.config['STALKER_API_KEYS'].split(',')
 		except KeyError:
 			input(f'{Style.BRIGHT}{Back.RED}API key(s) not found!{Back.RESET}')
 
@@ -2415,13 +2415,18 @@ class Stalker:
 
 		if clan:
 			target = target['clan']
-			prev_target = prev_target['clan']	
+			prev_target = prev_target['clan']
 
 		if diff:
-			with open(f'targets/{target_id}.txt', 'a', encoding='utf-8') as f:	
+			with open(f'targets/{target_id}.txt', 'a', encoding='utf-8') as f:
 				current_time = self.get_current_time()
 
 				f.write(f'{current_time}\n\n')
+
+				elif not target:
+					f.write('Left the clan!\n\n')
+
+					return
 
 				for d in diff:
 					if not target[d] or target[d] == -1:
@@ -2487,7 +2492,7 @@ class Stalker:
 
 		name = data.get('name', {})
 		description = data.get('description')
-		created = data.get('creationTime').replace('T', ' ').replace('Z', '')
+		created = data.get('creationTime', '').replace('T', ' ').replace('Z', '')
 
 		if created:
 			created = created.split('.')[0]
@@ -2495,7 +2500,7 @@ class Stalker:
 		xp = data.get('xp')
 		language = data.get('language')
 		tag = data.get('tag')
-		memberCount = data.get('memberCount')
+		member_count = data.get('memberCount')
 
 		clan_data = {
 			'name': name,
@@ -2504,7 +2509,7 @@ class Stalker:
 			'xp': xp,
 			'language': language,
 			'tag': tag,
-			'memberCount': memberCount,
+			'member_count': member_count,
 			'members': {}
 		}
 
@@ -2519,16 +2524,16 @@ class Stalker:
 
 		for player in data:
 			player_id = player.get('playerId')
-			joined = player.get('creationTime')
-			xp = player.get('xp')
+			player_xp = player.get('xp')
 			co_leader = player.get('isCoLeader')
 			flair = player.get('flair')
+			joined = player.get('creationTime', '').replace('T', ' ').replace('Z', '').split('.')[0]
 
 			clan_data['members'][player_id] = {
-				'joined': joined,
-				'xp': xp,
+				'player_xp': player_xp,
 				'co_leader': co_leader,
-				'flair': flair
+				'flair': flair,
+				'joined': joined
 			}
 
 		return 0, clan_data
@@ -2668,17 +2673,6 @@ class Stalker:
 
 			time.sleep(0.1)
 
-		for i, target in enumerate(self.TARGETS.values()):
-			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
-			target = deepcopy(target[-1])
-
-			changes = self.get_changes(prev_target, target)
-
-			if changes:
-				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
-				
-				break
-
 		self.updating = False
 
 	def monitor(self):
@@ -2693,6 +2687,8 @@ class Stalker:
 			changes = self.get_changes(prev_target, target)
 
 			if changes:
+				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
+
 				clan_changes, info_changes = changes
 
 				for field in target:
@@ -2736,10 +2732,14 @@ class Stalker:
 			solo_lose_count = target['solo_lose_count']
 
 			clan = target['clan']
-			tag = clan.get('tag')
-			xp = clan.get('xp')
-			co_leader = clan.get('co_leader')
+
+			tag = clan.get('tag', '')
+			language = clan.get('language')
+			xp = clan.get('player_xp')
+			player_xp = clan.get('xp')
 			flair = clan.get('flair')
+			co_leader = clan.get('co_leader')
+			joined = clan.get('joined')
 
 			if tag:
 				tag += ' |'
@@ -2748,12 +2748,17 @@ class Stalker:
 			info += f'{tag}{name} {level} {status} {last_online}\n'
 
 			if clan:
-				info += f'🏰  {xp}xp ({flair}) '
+				info += f'🏰  {player_xp}xp'
+
+				if flair:
+					info += f' ({flair})'
+				
+				info += f' {joined}'
 
 				if co_leader:
-					info += 'CO-LEADER'
+					info += ' CO-LEADER'
 
-				info += '\n'
+				info += f' {language}\n'
 
 			info += f'{bio}\n'
 			info += f'🌹 {received_roses} {sent_roses}\n'
