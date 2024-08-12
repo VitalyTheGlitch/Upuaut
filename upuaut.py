@@ -1045,6 +1045,9 @@ class Tracker:
 					continue
 
 				else:
+					if 'прошлой' in service_message:
+						continue
+
 					if 'убили' in service_message:
 						sep = ' убили '
 
