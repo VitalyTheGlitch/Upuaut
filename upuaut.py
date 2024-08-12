@@ -2519,10 +2519,9 @@ class Stalker:
 
 		data = data.json()
 
-		name = data.get('name', {})
+		name = data.get('name')
 		description = data.get('description')
 		created = self.normalize_time(data.get('creationTime'))
-
 		total_xp = data.get('xp')
 		language = data.get('language')
 		tag = data.get('tag')
@@ -2532,7 +2531,6 @@ class Stalker:
 			'name': name,
 			'description': description,
 			'created': created,
-			'total_xp': total_xp,
 			'language': language,
 			'tag': tag,
 			'member_count': member_count,
@@ -2765,13 +2763,14 @@ class Stalker:
 
 			clan = target['clan']
 
-			tag = clan.get('tag', '')
-			language = clan.get('language', '?')
-			total_xp = clan.get('total_xp', '')
-			player_xp = clan.get('player_xp', '?')
-			flair = clan.get('flair', '')
-			co_leader = clan.get('co_leader', '')
-			joined = clan.get('joined', '')
+			clan_name = clan['name']
+			tag = clan['tag']
+			language = clan['language']
+			member_count = clan['member_count']
+			player_xp = clan.get('player_xp', '?xp')
+			flair = clan.get('flair')
+			co_leader = clan.get('co_leader')
+			joined = clan.get('joined')
 
 			if tag:
 				tag += ' |'
@@ -2780,11 +2779,11 @@ class Stalker:
 			info += f'{tag}{name} {level} {status} {last_online}\n'
 
 			if clan:
-				info += f'🏰  {player_xp}/{total_xp}'
+				info += f'🏰 {clan_name} {member_count}/50 {language} {player_xp}'
 				info += f' ({flair})' if flair else ''
 				info += f' {joined}' if joined else ''
 				info += ' CO-LEADER' if co_leader else ''
-				info += f' {language}\n'
+				info += '\n'
 
 			info += f'{bio}\n'
 			info += f'🌹 {received_roses} {sent_roses}\n'
