@@ -2423,7 +2423,7 @@ class Stalker:
 
 				f.write(f'{current_time}\n\n')
 
-				elif not target:
+				if not target:
 					f.write('Left the clan!\n\n')
 
 					return
