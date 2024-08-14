@@ -342,10 +342,10 @@ class Tracker:
 
 	def write_abilities(self, player, abilities):
 		if player not in self.PLAYER_ABILITIES:
-			self.PLAYER_ABILITIES[player] = icons
+			self.PLAYER_ABILITIES[player] = abilities
 
 		else:
-			self.PLAYER_ABILITIES[player].update(icons)
+			self.PLAYER_ABILITIES[player].update(abilities)
 
 	def save_abilities(self):
 		if not os.path.isdir('data'):
@@ -1083,27 +1083,6 @@ class Tracker:
 
 					continue
 
-				elif 'камень' in service_message:
-					players = service_message.split(' и убил его')[0].split(' бросил камень в ')
-
-					for p in range(2):
-						number = int(players[p].split(' ')[0]) - 1
-						name = players[p].split(' ')[1]	
-
-						if '/' in players[p]:
-							role = players[p].split(' / ')[1].split(')')[0]
-
-						else:
-							role = None
-
-						self.set_name(number, name)
-						self.PLAYERS[number]['dead'] = p
-
-						if role:
-							self.set_role(number, role)
-
-					continue
-
 				elif 'выстрелить' in service_message:
 					players = service_message.split(', но убил')[0].split(' попытался выстрелить в ')
 
@@ -1125,6 +1104,27 @@ class Tracker:
 
 					continue
 
+				elif 'камень' in service_message:
+					players = service_message.split(' и убил его')[0].split(' бросил камень в ')
+
+					for p in range(2):
+						number = int(players[p].split(' ')[0]) - 1
+						name = players[p].split(' ')[1]	
+
+						if '/' in players[p]:
+							role = players[p].split(' / ')[1].split(')')[0]
+
+						else:
+							role = None
+
+						self.set_name(number, name)
+						self.PLAYERS[number]['dead'] = p
+
+						if role:
+							self.set_role(number, role)
+
+					continue
+
 				else:
 					if 'прошлой' in service_message:
 						continue
@@ -1139,6 +1139,9 @@ class Tracker:
 						sep = ' убил '
 
 					player = service_message.split(sep)[1]
+
+			elif 'сделал' in service_message:
+				player = service_message.split(' сделал выстрел в ')[1]
 
 			elif 'зарезал' in service_message:
 				player = service_message.split(' зарезал ')[1]
