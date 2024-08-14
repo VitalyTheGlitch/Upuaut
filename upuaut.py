@@ -95,6 +95,7 @@ class Tracker:
 				'beast-hunter',
 				'bellringer'
 			],
+			'random-werewolf': 'WEREWOLF',
 			'random-werewolf-weak': 'WEREWOLF',
 			'random-werewolf-strong': 'WEREWOLF',
 			'random-support-werewolf': [
@@ -292,6 +293,13 @@ class Tracker:
 			self.PLAYER_CARDS[player] = cards
 
 		else:
+			for src_role, dst_role in cards.items():
+				if src_role not in self.PLAYER_CARDS[player]:
+					self.PLAYER_CARDS[player][src_role] = [dst_role]
+
+				elif dst_role not in self.PLAYER_CARDS[player][src_role]:
+					self.PLAYER_CARDS[player][src_role].append(dst_role)
+
 			self.PLAYER_CARDS[player].update(cards)
 
 	def save_cards(self):
@@ -321,6 +329,27 @@ class Tracker:
 
 		with open('data/icons.json', 'w') as icons_file:
 			json.dump(self.PLAYER_ICONS, icons_file)
+
+	def load_abilities(self):
+		try:
+			with open('data/abilities.json', 'r') as icons_file:
+				self.PLAYER_ABILITIES = json.load(icons_file)
+		except:
+			self.PLAYER_ABILITIES = {}
+
+	def write_abilities(self, player, abilities):
+		if player not in self.PLAYER_ABILITIES:
+			self.PLAYER_ABILITIES[player] = icons
+
+		else:
+			self.PLAYER_ABILITIES[player].update(icons)
+
+	def save_abilities(self):
+		if not os.path.isdir('data'):
+			os.mkdir('data')
+
+		with open('data/abilities.json', 'w') as icons_file:
+			json.dump(self.PLAYER_ABILITIES, icons_file)
 
 	def get_roles(self):
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Getting roles...')
@@ -505,20 +534,20 @@ class Tracker:
 		cards = {}
 
 		for card in data['roleCards']:
-			if card['rarity'] in ['COMMON', 'RARe']:
+			if card['rarity'] == 'COMMON':
 				continue
 
-			if card['roleId1'] == 'harlot':
-				card['roleId1'] = 'red-lady'
+			if card['roleIdBase'] == 'harlot':
+				card['roleIdBase'] = 'red-lady'
 
-			elif card['roleId1'] == 'cursed-human':
-				card['roleId1'] = 'cursed'
+			elif card['roleIdBase'] == 'cursed-human':
+				card['roleIdBase'] = 'cursed'
 
-			elif card['roleId1'] in ['fool', 'headhunter']:
+			elif card['roleIdBase'] in ['fool', 'headhunter']:
 				continue
 
-			if 'roleId2' in card:
-				cards[card['roleId1']] = card['roleId2']
+			if 'roleIdsAdvanced' in card:
+				cards[card['roleIdBase']] = card['roleIdsAdvanced']
 
 		time.sleep(0.1)
 
@@ -548,7 +577,8 @@ class Tracker:
 
 			for role in self.ROLES:
 				if achievement['roleId'] in self.ADVANCED_ROLES.get(role, []):
-					cards[role] = achievement['roleId']
+					if role not in cards:
+						cards[role] = [achievement['roleId']]
 
 					break
 
@@ -741,9 +771,7 @@ class Tracker:
 				self.PLAYERS[p]['aura'] = dst_role['aura']
 
 				if player['name'] and not player['hero'] and not is_random and dst_role['id'] not in self.ADVANCED_ROLES:
-					self.write_cards(player['name'], {
-						src_role: dst_role['id']
-					})
+					self.write_cards(player['name'], {src_role: dst_role['id']})
 
 				break
 
@@ -905,6 +933,10 @@ class Tracker:
 			rotation[r] = self.ROLES[role]
 			rotation[r]['id'] = role
 
+		for r in rotation:
+			if 'random' in r['id']:
+				rotation.append(rotation.pop(rotation.index(r)))
+
 		return rotation
 
 	def get_bearer(self):
@@ -984,6 +1016,9 @@ class Tracker:
 							if '/' in players[p]:
 								role = players[p].split(' / ')[1].split(')')[0]
 
+							else:
+								role = None
+
 							self.set_name(number, name)
 							self.PLAYERS[number]['dead'] = not p
 
@@ -999,6 +1034,9 @@ class Tracker:
 
 							if '/' in players[p]:
 								role = players[p].split(' / ')[1].split(')')[0]
+
+							else:
+								role = None
 
 							self.set_name(number, name)
 							self.PLAYERS[number]['dead'] = p
@@ -1018,6 +1056,9 @@ class Tracker:
 						if '/' in players[p]:
 							role = players[p].split(' / ')[1].split(')')[0]
 
+						else:
+							role = None
+
 						self.set_name(number, name)
 						self.PLAYERS[number]['dead'] = p
 
@@ -1035,6 +1076,9 @@ class Tracker:
 
 						if '/' in players[p]:
 							role = players[p].split(' / ')[1].split(')')[0]
+
+						else:
+							role = None
 
 						self.set_name(number, name)
 						self.PLAYERS[number]['dead'] = not p
@@ -1084,6 +1128,9 @@ class Tracker:
 
 						if '/' in players[p]:
 							role = players[p].split(' / ')[1].split(')')[0]
+
+						else:
+							role = None
 
 						self.set_name(number, name)
 						self.PLAYERS[number]['dead'] = p
@@ -1511,6 +1558,15 @@ class Tracker:
 			messages = player['messages']
 
 			cards = list(self.PLAYER_CARDS.get(name, {}).values())
+			flatten_cards = []
+
+			for c in cards:
+				if type(c) == list:
+					flatten_cards.extend(c)
+
+				else:
+					flatten_cards.append(c)
+
 			icons = self.PLAYER_ICONS.get(name, {})
 			possible = []
 
@@ -1908,7 +1964,15 @@ class Booster:
 
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Sending message...')
 
-		textarea.fill(' '.join([str(couple) for couple in couples]))
+		if len(couples) > 1:
+			message = 'My couples are '
+
+		else:
+			message  = 'My couple is '
+
+		message += ' '.join([str(couple) for couple in couples])
+
+		textarea.fill(message)
 		textarea.press('Enter')
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Message sent!')
@@ -2766,10 +2830,10 @@ class Stalker:
 
 			clan = target['clan']
 
-			clan_name = clan['name']
-			tag = clan['tag']
-			language = clan['language']
-			member_count = clan['member_count']
+			clan_name = clan.get('name')
+			tag = clan.get('tag', '')
+			language = clan.get('language')
+			member_count = clan.get('member_count')
 			player_xp = clan.get('player_xp', '?xp')
 			flair = clan.get('flair')
 			co_leader = clan.get('co_leader')
