@@ -811,8 +811,22 @@ class Tracker:
 
 		self.save_cards()
 
-	def remove_role(self, number, role):		
-		...
+	def remove_role(self, player, role):
+		player = self.PLAYERS[player]['name']
+
+		if role in self.PLAYER_CARDS[player]:
+			self.PLAYER_CARDS[player].pop(role)
+
+		else:
+			for card in self.PLAYER_CARDS[player]:
+				if role in self.PLAYER_CARDS[player][card]:
+					self.PLAYER_CARDS[player][card].remove(role)
+
+		if role in self.PLAYER_ICONS[player]:
+			self.PLAYER_ICONS[player].pop(role)
+
+		self.save_cards()
+		self.save_icons()
 
 	def set_cursed(self):
 		for r, role in enumerate(self.ROTATION):
@@ -1763,10 +1777,10 @@ class Tracker:
 			query = cmd.lower().split('remove ')[1].split(' from ')
 
 			if len(query) == 2:
-				role, number = query
+				role, player = query
 
-				if number.isdigit() and 1 <= int(number) <= 16:
-					player = int(cmd[2]) - 1
+				if player.isdigit() and 1 <= int(player) <= 16:
+					player = int(player) - 1
 
 					self.remove_role(player, role)
 
