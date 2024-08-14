@@ -294,13 +294,16 @@ class Tracker:
 
 		else:
 			for src_role, dst_role in cards.items():
+				if type(dst_role) == str:
+					dst_role = [dst_role]
+
 				if src_role not in self.PLAYER_CARDS[player]:
-					self.PLAYER_CARDS[player][src_role] = [dst_role]
+					self.PLAYER_CARDS[player][src_role] = dst_role
 
-				elif dst_role not in self.PLAYER_CARDS[player][src_role]:
-					self.PLAYER_CARDS[player][src_role].append(dst_role)
-
-			self.PLAYER_CARDS[player].update(cards)
+				else:
+					for role in dst_role:
+						if role not in self.PLAYER_CARDS[player][src_role]:
+							self.PLAYER_CARDS[player][src_role].append(role)
 
 	def save_cards(self):
 		if not os.path.isdir('data'):
@@ -532,6 +535,7 @@ class Tracker:
 		player_id = data['id']
 
 		cards = {}
+		abilities = {}
 
 		for card in data['roleCards']:
 			if card['rarity'] == 'COMMON':
@@ -547,7 +551,35 @@ class Tracker:
 				continue
 
 			if 'roleIdsAdvanced' in card:
+				for i in range(len(card['roleIdsAdvanced'])):
+					if card['roleIdsAdvanced'][i] == 'harlot':
+						card['roleIdsAdvanced'][i] = 'red-lady'
+
+					elif card['roleIdsAdvanced'][i] == 'cursed-human':
+						card['roleIdsAdvanced'][i] = 'cursed'
+
 				cards[card['roleIdBase']] = card['roleIdsAdvanced']
+
+			role_abilities = []
+
+			for i in range(1, 6):
+				ability = card.get(f'abilityId{i}', '')
+
+				if 'highlight-chat-msg-' in ability:
+					ability = 'highlight'
+
+				elif 'discussion-time-increase-decrease-' in ability:
+					ability = 'time'
+
+				else:
+					continue
+
+				role_abilities.append(ability)
+
+			abilities[card['roleIdBase']] = role_abilities
+
+			for advanced_role in card['roleIdsAdvanced']:
+				abilities[advanced_role] = role_abilities
 
 		time.sleep(0.1)
 
@@ -582,7 +614,7 @@ class Tracker:
 
 					break
 
-		return 0, cards, icons
+		return 0, cards, icons, abilities
 
 	def storm(self):
 		PLAYERS_OLD = deepcopy(self.PLAYERS)
@@ -640,7 +672,7 @@ class Tracker:
 
 			return data[0]
 
-		cards, icons = data[1:]
+		cards, icons, abilities = data[1:]
 
 		self.PLAYERS[player]['name'] = name
 
@@ -649,6 +681,7 @@ class Tracker:
 
 		self.write_cards(name, cards)
 		self.write_icons(name, icons)
+		self.write_abilities(name, abilities)
 
 		role = self.PLAYERS[player]['role']
 
@@ -662,6 +695,7 @@ class Tracker:
 		if not threaded:
 			self.save_cards()
 			self.save_icons()
+			self.save_abilities()
 
 	def set_role(self, player, role):
 		for r in range(len(self.ROTATION)):
@@ -776,6 +810,9 @@ class Tracker:
 				break
 
 		self.save_cards()
+
+	def remove_role(self, number, role):		
+		...
 
 	def set_cursed(self):
 		for r, role in enumerate(self.ROTATION):
@@ -1483,6 +1520,7 @@ class Tracker:
 
 		self.load_cards()
 		self.load_icons()
+		self.load_abilities()
 
 		self.ROLES, self.ADVANCED_ROLES = self.get_roles()
 		self.ICONS = self.get_icons()
@@ -1567,6 +1605,7 @@ class Tracker:
 				else:
 					flatten_cards.append(c)
 
+			cards = flatten_cards
 			icons = self.PLAYER_ICONS.get(name, {})
 			possible = []
 
@@ -1717,6 +1756,23 @@ class Tracker:
 			else:
 				input(f'\n{Style.BRIGHT}{Back.RED}Invalid syntax!{Back.RESET}')
 
+		elif cmd.lower().startswith('remove '):
+			query = cmd.lower().split('remove ')[1].split(' from ')
+
+			if len(query) == 2:
+				role, number = query
+
+				if number.isdigit() and 1 <= int(number) <= 16:
+					player = int(cmd[2]) - 1
+
+					self.remove_role(player, role)
+
+				else:
+					input(f'\n{Style.BRIGHT}{Back.RED}Incorrect number!{Back.RESET}')
+
+			else:
+				input(f'\n{Style.BRIGHT}{Back.RED}Invalid syntax!{Back.RESET}')
+
 		elif cmd.lower() == 'cursed turned':
 			self.set_cursed()
 
@@ -1753,6 +1809,7 @@ class Tracker:
 				print(f'{Style.BRIGHT}{Fore.RED}[number] [= / !=] [number]')
 				print(f'{Style.BRIGHT}{Fore.RED}Name of [number] is [name]')
 				print(f'{Style.BRIGHT}{Fore.RED}Change [role] to [role]')
+				print(f'{Style.BRIGHT}{Fore.RED}Remove [role] from [number]')
 				print(f'{Style.BRIGHT}{Fore.RED}Clear [number]')
 				print(f'{Style.BRIGHT}{Fore.RED}Cursed turned')
 				print(f'{Style.BRIGHT}{Fore.RED}Storm to rediscover')
@@ -2991,10 +3048,10 @@ class Stalker:
 					break
 		except KeyboardInterrupt:
 			return
-		# except Exception as e:
-		# 	input(f'\n{Style.BRIGHT}{Back.RED}{str(e)}{Back.RESET}')
+		except Exception as e:
+			input(f'\n{Style.BRIGHT}{Back.RED}{str(e)}{Back.RESET}')
 
-		# 	return
+			return
 
 
 class Browser:
