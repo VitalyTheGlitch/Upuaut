@@ -11,6 +11,7 @@ import subprocess
 import dateutil
 import pytz
 import time
+import random
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from copy import deepcopy
 from playsound import playsound
@@ -383,7 +384,7 @@ class Tracker:
 			elif role['id'] == 'random-killer':
 				role['name'] = 'RK'
 
-			elif role['name'] == 'random-voting':
+			elif role['id'] == 'random-voting':
 				role['name'] = 'RV'
 
 			if role['team'] in ['VILLAGER', 'RANDOM_VILLAGER']:
@@ -2537,7 +2538,7 @@ class Stalker:
 
 		dt = dateutil.parser.parse(dt)
 		dt = dt.astimezone(self.TIMEZONE)
-		dt = dt.strftime('%Y.%m.%d %H:%M:%S')
+		dt = dt.strftime('%d.%m.%Y %H:%M:%S')
 
 		return dt
 
@@ -2622,7 +2623,7 @@ class Stalker:
 
 	def auto_update(self):
 		while True:
-			time.sleep(600)
+			time.sleep(random.randint(60, 600))
 
 			self.update_targets()
 
@@ -2880,6 +2881,7 @@ class Stalker:
 			status = target['status']
 
 			last_online = target['last_online']
+			created = target['created']
 
 			received_roses = target['received_roses']
 			sent_roses = target['sent_roses']
@@ -2916,7 +2918,7 @@ class Stalker:
 			if tag:
 				tag += ' |'
 
-			info = f'{i + 1}'.ljust(3) + f'{player_id}\n'
+			info = f'{i + 1}\n{player_id}\n'
 			info += f'{tag}{name} {level} {status} {last_online}\n'
 
 			if clan:
@@ -2946,6 +2948,9 @@ class Stalker:
 
 			if solo_win_count != -1:
 				info += f'🔪 {solo_win_count} {solo_lose_count}\n'
+
+			if created:
+				info += f'⏳ {created}\n'
 
 			targets_info += info + '\n'
 
