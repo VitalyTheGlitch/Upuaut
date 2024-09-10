@@ -122,6 +122,8 @@ class Tracker:
 		for _ in range(16):
 			self.PLAYERS.append({
 				'name': None,
+				'level': -1,
+				'min_level': -1,
 				'role': None,
 				'team': None,
 				'teams_exclude': set(),
@@ -146,6 +148,21 @@ class Tracker:
 		self.day_chat = None
 		self.dead_chat = None
 		self.last_message_number = 0
+
+	@staticmethod
+	def calculate_player_min_level(received_roses, sent_roses, win_count, lose_count, clan_xp):
+		min_levels = [
+			(clan_xp // 2000) if clan_xp != -1 else 1,
+			(win_count * 60 + lose_count * 20) * 1.5 if win_count != -1 else 1,
+			(received_roses + sent_roses) // 20
+		]
+
+		for i in range(len(min_levels)):
+			print(min_levels[i])
+			if not min_levels[i]:
+				min_levels = 1
+
+		return max(min_levels)
 
 	@property
 	def bot_headers(self):
@@ -438,12 +455,6 @@ class Tracker:
 			'name': 'RO'
 		}
 
-		roles['blight'] = {
-			'team': 'SOLO',
-			'aura': 'UNKNOWN',
-			'name': 'Blight'
-		}
-
 		advanced_roles = data['advancedRolesMapping']
 
 		advanced_roles['cursed'] = advanced_roles.pop('cursed-human')
@@ -532,8 +543,25 @@ class Tracker:
 			return data.status_code, data.text
 
 		data = data.json()
-
+		game_stats = data.get('gameStats', {})
+		
 		player_id = data['id']
+		level = data.get('level', -1)
+		received_roses = data.get('receivedRosesCount', -1)
+		sent_roses = data.get('sentRosesCount', -1)
+		win_count = game_stats.get('totalWinCount', -1)
+		lose_count = game_stats.get('totalLoseCount', -1)
+		play_time = game_stats.get('totalPlayTimeInMinutes', -1)
+		clan_id = data.get('clanId')
+		clan_xp = self.get_player_clan_xp(clan_id, player_id)
+
+		min_level = self.calculate_player_min_level(
+			received_roses,
+			sent_roses,
+			win_count,
+			lose_count,
+			clan_xp
+		) if level == -1 else level
 
 		cards = {}
 		abilities = {}
@@ -615,7 +643,26 @@ class Tracker:
 
 					break
 
-		return 0, cards, icons, abilities
+		return 0, level, min_level, cards, icons, abilities
+
+	def get_player_clan_xp(self, clan_id, player_id):
+		if not clan_id:
+			return -1
+
+		ENDPOINT = f'clans/{clan_id}/members'
+
+		data = requests.get(f'{self.BOT_BASE_URL}{ENDPOINT}', headers=self.bot_headers, verify=False)
+
+		if not data.ok:
+			return -1
+
+		data = data.json()
+
+		for player in data:
+			if player_id == player.get('playerId'):
+				return player.get('xp')
+
+		return -1
 
 	def storm(self):
 		PLAYERS_OLD = deepcopy(self.PLAYERS)
@@ -625,6 +672,8 @@ class Tracker:
 		for _ in range(16):
 			self.PLAYERS.append({
 				'name': None,
+				'level': -1,
+				'min_level': -1,
 				'role': None,
 				'team': None,
 				'teams_exclude': set(),
@@ -673,12 +722,15 @@ class Tracker:
 
 			return data[0]
 
-		cards, icons, abilities = data[1:]
+		level, min_level, cards, icons, abilities = data[1:]
 
 		self.PLAYERS[player]['name'] = name
 
 		if self.PLAYERS[player]['hero']:
 			return
+
+		self.PLAYERS[player]['level'] = level
+		self.PLAYERS[player]['min_level'] = min_level
 
 		self.write_cards(name, cards)
 		self.write_icons(name, icons)
@@ -1551,6 +1603,8 @@ class Tracker:
 		for _ in range(16):
 			self.PLAYERS.append({
 				'name': None,
+				'level': -1,
+				'min_level': -1,
 				'role': None,
 				'team': None,
 				'teams_exclude': set(),
@@ -1608,6 +1662,8 @@ class Tracker:
 
 		for i, player in enumerate(self.PLAYERS):
 			name = player['name']
+			level = player['level']
+			min_level = player['min_level']
 			team = player['team']
 			teams_exclude = player['teams_exclude']
 			aura = player['aura']
@@ -1658,6 +1714,12 @@ class Tracker:
 
 			if name:
 				info += f' {name}'
+
+			if level != -1:
+				info += f' ⭐{level}'
+
+			elif min_level != -1:
+				info += f' ⭐{min_level}+'
 
 			info += f' ({len(messages)})'
 
@@ -2728,7 +2790,7 @@ class Stalker:
 		game_stats = data.get('gameStats', {})
 
 		name = data.get('username')
-		level = data.get('level')
+		level = data.get('level', -1)
 		bio = data.get('personalMessage')
 		status = data.get('status')
 
@@ -2750,26 +2812,26 @@ class Stalker:
 		last_online = self.normalize_time(data.get('lastOnline'))
 		created = self.normalize_time(data.get('creationTime'))
 
-		received_roses = data.get('receivedRosesCount')
-		sent_roses = data.get('sentRosesCount')
+		received_roses = data.get('receivedRosesCount', -1)
+		sent_roses = data.get('sentRosesCount', -1)
 
-		win_count = game_stats.get('totalWinCount')
-		lose_count = game_stats.get('totalLoseCount')
-		tie_count = game_stats.get('totalTieCount')
+		win_count = game_stats.get('totalWinCount', -1)
+		lose_count = game_stats.get('totalLoseCount', -1)
+		tie_count = game_stats.get('totalTieCount', -1)
 
 		play_time = self.convert_play_time(game_stats.get('totalPlayTimeInMinutes', -1))
 
-		village_win_count = game_stats.get('villageWinCount')
-		village_lose_count = game_stats.get('villageLoseCount')
+		village_win_count = game_stats.get('villageWinCount', -1)
+		village_lose_count = game_stats.get('villageLoseCount', -1)
 
-		werewolf_win_count = game_stats.get('werewolfWinCount')
-		werewolf_lose_count = game_stats.get('werewolfLoseCount')
+		werewolf_win_count = game_stats.get('werewolfWinCount', -1)
+		werewolf_lose_count = game_stats.get('werewolfLoseCount', -1)
 
-		voting_win_count = game_stats.get('votingWinCount')
-		voting_lose_count = game_stats.get('votingLoseCount')
+		voting_win_count = game_stats.get('votingWinCount', -1)
+		voting_lose_count = game_stats.get('votingLoseCount', -1)
 
-		solo_win_count = game_stats.get('soloWinCount')
-		solo_lose_count = game_stats.get('soloLoseCount')
+		solo_win_count = game_stats.get('soloWinCount', -1)
+		solo_lose_count = game_stats.get('soloLoseCount', -1)
 
 		clan_id = data.get('clanId')
 		clan = {}
@@ -2830,7 +2892,7 @@ class Stalker:
 
 			self.write_target(target_id, data[1])
 
-			time.sleep(0.1)
+			time.sleep(1)
 
 		for i, target in enumerate(self.TARGETS.values()):
 			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
