@@ -158,7 +158,6 @@ class Tracker:
 		]
 
 		for i in range(len(min_levels)):
-			print(min_levels[i])
 			if not min_levels[i]:
 				min_levels = 1
 
