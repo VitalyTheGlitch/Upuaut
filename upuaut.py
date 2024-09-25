@@ -2087,7 +2087,6 @@ class Booster:
 							couples.append(4 * (i - 1) + j)
 
 					players.append(player)
-
 				except PlaywrightTimeoutError:
 					continue
 
@@ -2131,7 +2130,7 @@ class Booster:
 			if remaining_time - 5 >= 0:
 				time.sleep(remaining_time - 5)
 
-			chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div[2]/div/div[1]/div/div/div/div')
+			chat = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[1]/div[3]/div/div[2]/div/div[1]/div/div/div')
 
 			messages = chat.evaluate('''
 				(chat) => {
@@ -2364,10 +2363,10 @@ class Booster:
 					self.play()
 		except KeyboardInterrupt:
 			return
-		except Exception as e:
-			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
+		# except Exception as e:
+		# 	input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
 
-			return
+		# 	return
 
 
 class Spinner:
