@@ -2263,11 +2263,7 @@ class Booster:
 					continue
 
 			print(f'{Style.BRIGHT}{Fore.GREEN}End!')
-
-
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Exiting...')
-
-			time.sleep(1)
 
 			try:
 				play_again_button = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[2]/div[3]/div[5]/div[2]/div/div[2]').get_by_text('Играть снова')
@@ -2289,7 +2285,7 @@ class Booster:
 					if close_popup_button.text_content(timeout=1000) == 'Окей':
 						close_popup_button.click()
 				except PlaywrightTimeoutError:
-					self.page.get_by_text('\uf015').click(timeout=10000)
+					self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[2]/div[3]/div[5]/div[1]/div/div').click(timeout=1000)
 
 				return
 
