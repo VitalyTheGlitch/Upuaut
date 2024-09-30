@@ -159,7 +159,7 @@ class Tracker:
 
 		for i in range(len(min_levels)):
 			if not min_levels[i]:
-				min_levels = 1
+				min_levels[i] = 1
 
 		return max(min_levels)
 
