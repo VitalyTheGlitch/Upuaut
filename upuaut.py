@@ -153,7 +153,7 @@ class Tracker:
 	def calculate_player_min_level(received_roses, sent_roses, win_count, lose_count, clan_xp):
 		min_levels = [
 			(clan_xp // 2000) if clan_xp != -1 else 1,
-			(win_count * 60 + lose_count * 20) * 1.5 if win_count != -1 else 1,
+			(win_count * 60 + lose_count * 20) * 1.5 / 2000 if win_count != -1 else 1,
 			(received_roses + sent_roses) // 20
 		]
 
