@@ -2359,10 +2359,10 @@ class Booster:
 					self.play()
 		except KeyboardInterrupt:
 			return
-		# except Exception as e:
-		# 	input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
+		except Exception as e:
+			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
 
-		# 	return
+			return
 
 
 class Spinner:
