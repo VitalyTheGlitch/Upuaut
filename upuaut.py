@@ -31,7 +31,19 @@ class Tracker:
 			self.API_KEYS = self.config['TRACKER_API_KEYS'].split(',')
 			self.USER_AGENT = self.config['USER_AGENT']
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}API key(s) / User Agent not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}API key(s) / User Agent / Browser Viewport not found!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.BROWSER_VIEWPORT = self.config['BROWSER_VIEWPORT'].split(',')
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport not found!{Back.RESET}')
+
+			os.abort()
+
+		if len(self.BROWSER_VIEWPORT) != 2:
+			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport is invalid!{Back.RESET}')
 
 			os.abort()
 
@@ -153,7 +165,7 @@ class Tracker:
 	def calculate_player_min_level(received_roses, sent_roses, win_count, lose_count, clan_xp):
 		min_levels = [
 			(clan_xp // 2000) if clan_xp != -1 else 1,
-			(win_count * 60 + lose_count * 20) * 1.5 / 2000 if win_count != -1 else 1,
+			(win_count * 60 + lose_count * 20) * 1.5 // 2000 if win_count != -1 else 1,
 			(received_roses + sent_roses) // 20
 		]
 
@@ -1913,8 +1925,8 @@ class Tracker:
 					user_data_dir=self.USER_DATA_DIR,
 					user_agent=self.USER_AGENT,
 					viewport={
-						'width': 960,
-						'height': 972
+						'width': int(self.BROWSER_VIEWPORT[0]),
+						'height': int(self.BROWSER_VIEWPORT[1])
 					},
 					executable_path=self.EXECUTABLE_PATH,
 					headless=False,
@@ -2008,6 +2020,18 @@ class Booster:
 
 			os.abort()
 
+		try:
+			self.BROWSER_VIEWPORT = self.config['BROWSER_VIEWPORT'].split(',')
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport not found!{Back.RESET}')
+
+			os.abort()
+
+		if len(self.BROWSER_VIEWPORT) != 2:
+			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport is invalid!{Back.RESET}')
+
+			os.abort()
+
 		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\Upuaut'
 		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 		self.page = None
@@ -2037,7 +2061,7 @@ class Booster:
 
 					player_base_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
 					player_img_base_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
-					name_locator = player_base_locator.locator('xpath=/div[1]/div/div[4]/div/div')
+					name_locator = player_base_locator.locator('xpath=/div[1]/div')
 					name = name_locator.text_content(timeout=1000).split(' ')[1]
 					icons = player_img_base_locator.evaluate('''
 						(player) => {
@@ -2300,8 +2324,8 @@ class Booster:
 					user_data_dir=self.USER_DATA_DIR,
 					user_agent=self.USER_AGENT,
 					viewport={
-						'width': 960,
-						'height': 972
+						'width': int(self.BROWSER_VIEWPORT[0]),
+						'height': int(self.BROWSER_VIEWPORT[1])
 					},
 					executable_path=self.EXECUTABLE_PATH,
 					headless=False,
@@ -3148,7 +3172,7 @@ class Browser:
 
 
 def banner(module=None):
-	os.system('cls')
+	os.system('cls' if os.name == 'nt' else 'clear')
 
 	message = f'{Style.BRIGHT}{Fore.RED}Upu{Fore.YELLOW}aut{Fore.RESET}'
 
