@@ -35,13 +35,37 @@ class Tracker:
 			os.abort()
 
 		try:
-			self.BROWSER_VIEWPORT = self.config['BROWSER_VIEWPORT'].split(',')
+			self.CHROME_EXECUTABLE = self.config['CHROME_EXECUTABLE']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome not found!{Back.RESET}')
+
+			os.abort()
+
+		if not os.path.isfile(self.CHROME_EXECUTABLE):
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.CHROME_USER_DATA = os.path.join(self.config['CHROME_USER_DATA'], 'Upuaut')
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome User Data not found!{Back.RESET}')
+
+			os.abort()
+
+		if not os.path.isdir(self.CHROME_USER_DATA):
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome User Data is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.CHROME_VIEWPORT = self.config['CHROME_VIEWPORT'].split(',')
 		except KeyError:
 			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport not found!{Back.RESET}')
 
 			os.abort()
 
-		if len(self.BROWSER_VIEWPORT) != 2:
+		if len(self.CHROME_VIEWPORT) != 2:
 			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport is invalid!{Back.RESET}')
 
 			os.abort()
@@ -151,9 +175,6 @@ class Tracker:
 		self.PLAYER_LAYERS = []
 
 		self.BEARER_HEADERS = {}
-
-		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\Upuaut'
-		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 
 		self.page = None
 		self.day_chat = None
@@ -1921,12 +1942,12 @@ class Tracker:
 				print(f'{Style.BRIGHT}{Fore.YELLOW}Opening website...')
 
 				context = playwright.chromium.launch_persistent_context(
-					user_data_dir=self.USER_DATA_DIR,
+					user_data_dir=self.CHROME_USER_DATA,
 					viewport={
-						'width': int(self.BROWSER_VIEWPORT[0]),
-						'height': int(self.BROWSER_VIEWPORT[1])
+						'width': int(self.CHROME_VIEWPORT[0]),
+						'height': int(self.CHROME_VIEWPORT[1])
 					},
-					executable_path=self.EXECUTABLE_PATH,
+					executable_path=self.CHROME_EXECUTABLE,
 					headless=False,
 					args=['--window-position=-7,40', '--mute-audio'],
 					ignore_default_args=['--enable-automation'],
@@ -2012,19 +2033,41 @@ class Booster:
 		self.config = dotenv_values('.env')
 
 		try:
-			self.BROWSER_VIEWPORT = self.config['BROWSER_VIEWPORT'].split(',')
+			self.CHROME_EXECUTABLE = self.config['CHROME_EXECUTABLE']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome not found!{Back.RESET}')
+
+			os.abort()
+
+		if not os.path.isfile(self.CHROME_EXECUTABLE):
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.CHROME_USER_DATA = os.path.join(self.config['CHROME_USER_DATA'], 'Upuaut')
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome User Data not found!{Back.RESET}')
+
+			os.abort()
+
+		if not os.path.isdir(self.CHROME_USER_DATA):
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome User Data is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.CHROME_VIEWPORT = self.config['CHROME_VIEWPORT'].split(',')
 		except KeyError:
 			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport not found!{Back.RESET}')
 
 			os.abort()
 
-		if len(self.BROWSER_VIEWPORT) != 2:
+		if len(self.CHROME_VIEWPORT) != 2:
 			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport is invalid!{Back.RESET}')
 
 			os.abort()
 
-		self.USER_DATA_DIR = os.getenv('LOCALAPPDATA') + '\\Google\\Chrome\\User Data\\Upuaut'
-		self.EXECUTABLE_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
 		self.page = None
 
 	def act_villager(self):
@@ -2312,12 +2355,12 @@ class Booster:
 				print(f'{Style.BRIGHT}{Fore.YELLOW}Opening website...')
 
 				context = playwright.chromium.launch_persistent_context(
-					user_data_dir=self.USER_DATA_DIR,
+					user_data_dir=self.CHROME_USER_DATA,
 					viewport={
-						'width': int(self.BROWSER_VIEWPORT[0]),
-						'height': int(self.BROWSER_VIEWPORT[1])
+						'width': int(self.CHROME_VIEWPORT[0]),
+						'height': int(self.CHROME_VIEWPORT[1])
 					},
-					executable_path=self.EXECUTABLE_PATH,
+					executable_path=self.CHROME_EXECUTABLE,
 					headless=False,
 					args=['--window-position=-7,40', '--mute-audio'],
 					ignore_default_args=['--enable-automation'],
@@ -2384,13 +2427,13 @@ class Spinner:
 		self.config = dotenv_values('.env')
 
 		try:
-			self.BLUESTACKS5_PATH = self.config['BLUESTACKS5_PATH']
+			self.BLUESTACKS5_EXECUTABLE = self.config['BLUESTACKS5_EXECUTABLE']
 		except KeyError:
 			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 not found!{Back.RESET}')
 
 			os.abort()
 
-		if not os.path.isfile(self.BLUESTACKS5_PATH):
+		if not os.path.isfile(self.BLUESTACKS5_EXECUTABLE):
 			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 is invalid!{Back.RESET}')
 
 			os.abort()
@@ -2506,7 +2549,7 @@ class Spinner:
 
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for BlueStacks 5...')
 
-		subprocess.Popen(self.BLUESTACKS5_PATH, stdout=subprocess.PIPE)
+		subprocess.Popen(self.BLUESTACKS5_EXECUTABLE, stdout=subprocess.PIPE)
 
 		self.home()
 
