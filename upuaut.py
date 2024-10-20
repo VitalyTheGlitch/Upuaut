@@ -12,7 +12,7 @@ import dateutil
 import pytz
 import time
 import random
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from undetected_playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 from copy import deepcopy
 from playsound import playsound
 from colorama import Back, Fore, Style, init
@@ -29,9 +29,8 @@ class Tracker:
 
 		try:
 			self.API_KEYS = self.config['TRACKER_API_KEYS'].split(',')
-			self.USER_AGENT = self.config['USER_AGENT']
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}API key(s) / User Agent / Browser Viewport not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}API key(s) not found!{Back.RESET}')
 
 			os.abort()
 
@@ -1923,7 +1922,6 @@ class Tracker:
 
 				context = playwright.chromium.launch_persistent_context(
 					user_data_dir=self.USER_DATA_DIR,
-					user_agent=self.USER_AGENT,
 					viewport={
 						'width': int(self.BROWSER_VIEWPORT[0]),
 						'height': int(self.BROWSER_VIEWPORT[1])
@@ -2012,13 +2010,6 @@ class Tracker:
 class Booster:
 	def __init__(self):
 		self.config = dotenv_values('.env')
-
-		try:
-			self.USER_AGENT = self.config['USER_AGENT']
-		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}User Agent not found!{Back.RESET}')
-
-			os.abort()
 
 		try:
 			self.BROWSER_VIEWPORT = self.config['BROWSER_VIEWPORT'].split(',')
@@ -2322,7 +2313,6 @@ class Booster:
 
 				context = playwright.chromium.launch_persistent_context(
 					user_data_dir=self.USER_DATA_DIR,
-					user_agent=self.USER_AGENT,
 					viewport={
 						'width': int(self.BROWSER_VIEWPORT[0]),
 						'height': int(self.BROWSER_VIEWPORT[1])
@@ -3156,21 +3146,6 @@ class Stalker:
 			return
 
 
-class Browser:
-	def run(self):
-		banner(self.__class__.__name__)
-
-		print(f'\n{Style.BRIGHT}{Fore.RED}Once the browser opens, open any request to Wolvesville.')
-		print(f'{Style.BRIGHT}{Fore.RED}Copy the "User-Agent" header and paste it into the environment file.')
-		print(f'{Style.BRIGHT}{Fore.RED}You can then close the browser and use the program.')
-		print(f'\n{Style.BRIGHT}{Fore.RED}Press Enter to continue.{Fore.RESET}')
-		input()
-
-		subprocess.Popen('start chrome --user-data-dir="%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Upuaut" wolvesville.com', shell=True)
-
-		os.abort()
-
-
 def banner(module=None):
 	os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -3188,7 +3163,7 @@ try:
 	while True:
 		banner()
 
-		modules = [Tracker(), Booster(), Spinner(), Stalker(), Browser()]
+		modules = [Tracker(), Booster(), Spinner(), Stalker()]
 		module = None
 
 		for i, module in enumerate(modules):

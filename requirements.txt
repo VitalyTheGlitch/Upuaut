@@ -10,3 +10,4 @@ python-dateutil
 python-dotenv
 pytz
 requests
+undetected-playwright-patch
