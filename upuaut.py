@@ -1949,7 +1949,11 @@ class Tracker:
 					},
 					executable_path=self.CHROME_EXECUTABLE,
 					headless=False,
-					args=['--window-position=-7,40', '--mute-audio'],
+					args=[
+						'--window-position=-7,40',
+						'--mute-audio',
+						'--disable-blink-features=AutomationControlled'
+					],
 					ignore_default_args=['--enable-automation'],
 					chromium_sandbox=True
 				)
@@ -2362,7 +2366,11 @@ class Booster:
 					},
 					executable_path=self.CHROME_EXECUTABLE,
 					headless=False,
-					args=['--window-position=-7,40', '--mute-audio'],
+					args=[
+						'--window-position=-7,40',
+						'--mute-audio',
+						'--disable-blink-features=AutomationControlled'
+					],
 					ignore_default_args=['--enable-automation'],
 					chromium_sandbox=True
 				)
