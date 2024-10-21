@@ -41,7 +41,7 @@ class Tracker:
 
 			os.abort()
 
-		if not os.path.exists(self.CHROME_EXECUTABLE):
+		if not os.path.isfile(self.CHROME_EXECUTABLE):
 			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome is invalid!{Back.RESET}')
 
 			os.abort()
@@ -2039,7 +2039,7 @@ class Booster:
 
 			os.abort()
 
-		if not os.path.exists(self.CHROME_EXECUTABLE):
+		if not os.path.isfile(self.CHROME_EXECUTABLE):
 			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome is invalid!{Back.RESET}')
 
 			os.abort()
@@ -2418,168 +2418,6 @@ class Booster:
 			return
 		except Exception as e:
 			input(f'\n{Style.BRIGHT}{Back.RED}Browser closed!{Back.RESET}')
-
-			return
-
-
-class Spinner:
-	def __init__(self):
-		self.config = dotenv_values('.env')
-
-		try:
-			self.BLUESTACKS5_EXECUTABLE = self.config['BLUESTACKS5_EXECUTABLE']
-		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 not found!{Back.RESET}')
-
-			os.abort()
-
-		if not os.path.exists(self.BLUESTACKS5_EXECUTABLE):
-			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 is invalid!{Back.RESET}')
-
-			os.abort()
-
-		try:
-			self.BLUESTACKS5_NAME = self.config['BLUESTACKS5_NAME']
-		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window not found!{Back.RESET}')
-
-			os.abort()
-
-	@staticmethod
-	def wait(filename, confidence=0.9, check_fail=False, check_count=7, click=True):
-		fails = 0
-
-		while True:
-			coords = pyautogui.locateCenterOnScreen('images/' + filename, confidence=confidence)
-
-			if coords:
-				if click:
-					try:
-						pyautogui.click(*coords)
-					except pyautogui.FailSafeException:
-						continue
-
-				return 0
-
-			if check_fail:
-				fails += 1
-
-			if fails == check_count:
-				return 1
-
-			time.sleep(5)
-
-	@staticmethod
-	def open_wheel():
-		time.sleep(1)
-
-		while True:
-			header = pyautogui.locateCenterOnScreen('images/header.png', confidence=0.8)
-
-			if header:
-				break
-
-		pyautogui.click(header[0], header[1] + 35)
-
-	def kill(self):
-		for p in psutil.process_iter():
-			if p.name() == 'HD-Player.exe':
-				p.kill()
-
-				return
-
-	def back(self):
-		self.wait('back.png')
-
-	def home(self):
-		self.wait('home.png')
-
-	def close_all(self):
-		self.wait('recent.png')
-		self.wait('clear.png')
-
-	def spin(self):
-		while True:
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking ad button...')
-
-			pyautogui.moveTo(100, 100)
-
-			if not self.wait('done.png', confidence=0.8, check_fail=True, check_count=2):
-				print(f'{Style.BRIGHT}{Fore.GREEN}DONE!')
-
-				playsound('audio/confusion.mp3')
-
-				return 1
-
-			if self.wait('ad.png', confidence=0.8, check_fail=True):
-				print(f'{Style.BRIGHT}{Fore.RED}Loading takes too long.')
-
-				return
-
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Watching ad...')
-
-			time.sleep(35)
-
-			self.back()
-
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking spin button...')
-
-			if self.wait('spin.png', confidence=0.8, check_fail=True):
-				print(f'{Style.BRIGHT}{Fore.RED}Spin button not found.') 
-
-				return
-
-			else:
-				print(f'{Style.BRIGHT}{Fore.GREEN}Spinned!')
-
-	def prepare(self):
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for game load...')
-
-		while self.wait('game.png', check_fail=True):
-			self.home()
-
-		self.wait('profile.png', click=False)
-		self.wait('cancel.png', check_fail=True, check_count=3)
-		self.open_wheel()
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}Game loaded!')
-
-	def run(self):
-		banner(self.__class__.__name__)
-
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for BlueStacks 5...')
-
-		subprocess.Popen(self.BLUESTACKS5_EXECUTABLE, stdout=subprocess.PIPE)
-
-		self.home()
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}BlueStacks 5 found!')
-
-		try:
-			window = pygetwindow.getWindowsWithTitle(self.BLUESTACKS5_NAME)[0]
-			window.size = (540, 934)
-		except IndexError:
-			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window is invalid!{Back.RESET}')
-
-			os.abort()
-
-		try:
-			while True:
-				self.prepare()
-
-				if self.spin():
-					self.kill()
-
-					print(f'\n{Style.BRIGHT}{Fore.YELLOW}Press Enter to exit.{Fore.RESET}')
-					input()
-
-					return
-
-				print(f'{Style.BRIGHT}{Fore.YELLOW}Restarting...')
-
-				self.close_all()
-		except KeyboardInterrupt:
-			self.kill()
 
 			return
 
@@ -3189,6 +3027,168 @@ class Stalker:
 			return
 
 
+class Spinner:
+	def __init__(self):
+		self.config = dotenv_values('.env')
+
+		try:
+			self.BLUESTACKS5_EXECUTABLE = self.config['BLUESTACKS5_EXECUTABLE']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 not found!{Back.RESET}')
+
+			os.abort()
+
+		if not os.path.isfile(self.BLUESTACKS5_EXECUTABLE):
+			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.BLUESTACKS5_NAME = self.config['BLUESTACKS5_NAME']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window not found!{Back.RESET}')
+
+			os.abort()
+
+	@staticmethod
+	def wait(filename, confidence=0.9, check_fail=False, check_count=7, click=True):
+		fails = 0
+
+		while True:
+			coords = pyautogui.locateCenterOnScreen('images/' + filename, confidence=confidence)
+
+			if coords:
+				if click:
+					try:
+						pyautogui.click(*coords)
+					except pyautogui.FailSafeException:
+						continue
+
+				return 0
+
+			if check_fail:
+				fails += 1
+
+			if fails == check_count:
+				return 1
+
+			time.sleep(5)
+
+	@staticmethod
+	def open_wheel():
+		time.sleep(1)
+
+		while True:
+			header = pyautogui.locateCenterOnScreen('images/header.png', confidence=0.8)
+
+			if header:
+				break
+
+		pyautogui.click(header[0], header[1] + 35)
+
+	def kill(self):
+		for p in psutil.process_iter():
+			if p.name() == 'HD-Player.exe':
+				p.kill()
+
+				return
+
+	def back(self):
+		self.wait('back.png')
+
+	def home(self):
+		self.wait('home.png')
+
+	def close_all(self):
+		self.wait('recent.png')
+		self.wait('clear.png')
+
+	def spin(self):
+		while True:
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking ad button...')
+
+			pyautogui.moveTo(100, 100)
+
+			if not self.wait('done.png', confidence=0.8, check_fail=True, check_count=2):
+				print(f'{Style.BRIGHT}{Fore.GREEN}DONE!')
+
+				playsound('audio/confusion.mp3')
+
+				return 1
+
+			if self.wait('ad.png', confidence=0.8, check_fail=True):
+				print(f'{Style.BRIGHT}{Fore.RED}Loading takes too long.')
+
+				return
+
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Watching ad...')
+
+			time.sleep(35)
+
+			self.back()
+
+			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking spin button...')
+
+			if self.wait('spin.png', confidence=0.8, check_fail=True):
+				print(f'{Style.BRIGHT}{Fore.RED}Spin button not found.') 
+
+				return
+
+			else:
+				print(f'{Style.BRIGHT}{Fore.GREEN}Spinned!')
+
+	def prepare(self):
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for game load...')
+
+		while self.wait('game.png', check_fail=True):
+			self.home()
+
+		self.wait('profile.png', click=False)
+		self.wait('cancel.png', check_fail=True, check_count=3)
+		self.open_wheel()
+
+		print(f'{Style.BRIGHT}{Fore.GREEN}Game loaded!')
+
+	def run(self):
+		banner(self.__class__.__name__)
+
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for BlueStacks 5...')
+
+		subprocess.Popen(self.BLUESTACKS5_EXECUTABLE, stdout=subprocess.PIPE)
+
+		self.home()
+
+		print(f'{Style.BRIGHT}{Fore.GREEN}BlueStacks 5 found!')
+
+		try:
+			window = pygetwindow.getWindowsWithTitle(self.BLUESTACKS5_NAME)[0]
+			window.size = (540, 934)
+		except IndexError:
+			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			while True:
+				self.prepare()
+
+				if self.spin():
+					self.kill()
+
+					print(f'\n{Style.BRIGHT}{Fore.YELLOW}Press Enter to exit.{Fore.RESET}')
+					input()
+
+					return
+
+				print(f'{Style.BRIGHT}{Fore.YELLOW}Restarting...')
+
+				self.close_all()
+		except KeyboardInterrupt:
+			self.kill()
+
+			return
+
+
 def banner(module=None):
 	os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -3206,7 +3206,11 @@ try:
 	while True:
 		banner()
 
-		modules = [Tracker(), Booster(), Spinner(), Stalker()]
+		modules = [Tracker(), Booster(), Stalker()]
+
+		if os.name == 'nt':
+			modules.append(Spinner())
+
 		module = None
 
 		for i, module in enumerate(modules):
