@@ -1,8 +1,6 @@
 colorama
-dateutil
 ntplib
 playsound
-playwright
 psutil
 PyAutoGUI
 PyGetWindow

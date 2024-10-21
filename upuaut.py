@@ -41,7 +41,7 @@ class Tracker:
 
 			os.abort()
 
-		if not os.path.isfile(self.CHROME_EXECUTABLE):
+		if not os.path.exists(self.CHROME_EXECUTABLE):
 			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome is invalid!{Back.RESET}')
 
 			os.abort()
@@ -2039,7 +2039,7 @@ class Booster:
 
 			os.abort()
 
-		if not os.path.isfile(self.CHROME_EXECUTABLE):
+		if not os.path.exists(self.CHROME_EXECUTABLE):
 			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome is invalid!{Back.RESET}')
 
 			os.abort()
@@ -2433,7 +2433,7 @@ class Spinner:
 
 			os.abort()
 
-		if not os.path.isfile(self.BLUESTACKS5_EXECUTABLE):
+		if not os.path.exists(self.BLUESTACKS5_EXECUTABLE):
 			input(f'{Style.BRIGHT}{Back.RED}Path to BlueStacks 5 is invalid!{Back.RESET}')
 
 			os.abort()
