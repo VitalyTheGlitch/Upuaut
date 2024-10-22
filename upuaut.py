@@ -82,8 +82,7 @@ class Tracker:
 			},
 			'messages': {
 				'html': 'main.html',
-				'css': 'main.css',
-				'js': 'main.js'
+				'css': 'main.css'
 			}
 		}
 		self.ASSETS = {}
@@ -255,25 +254,55 @@ class Tracker:
 
 	def load_modal(self):
 		messages_html = self.ASSETS['messages']['html']
-		messages_js = self.ASSETS['messages']['js']
 
 		field = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[1]/div[1]/div[2]/div[2]/div/div[1]')
 		field.evaluate('''
-			(field, [messages_html, messages_js]) => {
+			(field, [messages_html]) => {
 				if (!document.querySelector(".modal-header")) {
+					function Modal(modal_selector) {
+					    const modal = document.querySelector(modal_selector);
+					    const header = modal.querySelector('.modal-header');
+					    const body = modal.querySelector('.modal-body');
+					    const buttonClose = modal.querySelector('.close-modal');
+
+					    buttonClose.addEventListener('click', closeModal, false);
+					    modal.addEventListener('click', (e) => e.stopPropagation());
+
+					    function setHeader(text) {
+					        header.firstChild.nodeValue = text;
+					    }
+
+					    function setBody(text) {
+					        body.innerHTML = text;
+					    }
+
+					    function openModal(e) {
+					        e && e.stopPropagation();
+
+					        modal.classList.add('opened');
+					        modal.classList.remove('closed');
+					    }
+
+					    function closeModal() {
+					        modal.classList.remove('opened');
+					        modal.classList.add('closed');
+					    }
+
+					    this.setHeader = setHeader;
+					    this.setBody = setBody;
+					    this.open = openModal;
+					    this.close = closeModal;
+					}
+
 					const html = document.createElement("div");
 					html.className = "modal-content messages";
 					html.innerHTML = messages_html;
-
 					field.appendChild(html);
 
-					const js = document.createElement("script");
-					js.innerHTML = messages_js;
-
-					document.body.appendChild(js);
+					window.messages = new Modal('.messages');
 				}
 			}
-		''', [messages_html, messages_js])
+		''', [messages_html,])
 
 	def load_see(self, number, layer):
 		see_html = self.ASSETS['see']['html'].format(number)
@@ -294,8 +323,9 @@ class Tracker:
 
 					if (player < 0 || player > 15) return;
 
-					const name = window.players[player]["name"];
-					const messages = window.players[player]["messages"];
+					const players = JSON.parse(localStorage.getItem("players"));
+					const name = players[player]["name"];
+					const messages = players[player]["messages"];
 
 					window.messages.setHeader(player + 1 + ' ' + name);
 					window.messages.setBody(messages.join("<br>"));
@@ -318,8 +348,9 @@ class Tracker:
 
 					if (player < 0 || player > 15) return;
 
-					const name = window.players[player]["name"];
-					const mentions = window.players[player]["mentions"];
+					const players = JSON.parse(localStorage.getItem("players"));
+					const name = players[player]["name"];
+					const mentions = players[player]["mentions"];
 
 					window.messages.setHeader(player + 1 + ' ' + name);
 					window.messages.setBody(mentions.join("<br>"));
@@ -1414,7 +1445,7 @@ class Tracker:
 
 					number = ''
 
-		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
+		self.page.evaluate('(players) => localStorage.setItem("players", players)', json.dumps(self.PLAYERS, default=list))
 
 	def set_players_range(self, number=0, start=0, end=16):
 		for player in self.PLAYER_LAYERS[start:end]:
@@ -1466,7 +1497,7 @@ class Tracker:
 			self.load_see(layer['number'], layer['locator'])
 
 		self.PREV_PLAYERS = [deepcopy(self.PLAYERS)]
-		self.page.evaluate('(players) => window.players = players', self.PLAYERS)
+		self.page.evaluate('(players) => localStorage.setItem("players", players)', json.dumps(self.PLAYERS, default=list))
 		self.save_cards()
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Players found!')
@@ -1997,8 +2028,20 @@ class Tracker:
 
 					self.get_bearer()
 					self.load_css()
-					self.find_players()
 					self.load_modal()
+
+					time.sleep(5);
+
+					x = self.page.evaluate('''
+						() => {
+							return window.messages;
+						}
+					''')
+
+					print(x)
+					input()
+
+					self.find_players()
 
 					roles = self.find_roles()
 					rotations = self.get_rotations()
