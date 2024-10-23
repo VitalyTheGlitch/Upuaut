@@ -2029,18 +2029,6 @@ class Tracker:
 					self.get_bearer()
 					self.load_css()
 					self.load_modal()
-
-					time.sleep(5);
-
-					x = self.page.evaluate('''
-						() => {
-							return window.messages;
-						}
-					''')
-
-					print(x)
-					input()
-
 					self.find_players()
 
 					roles = self.find_roles()
