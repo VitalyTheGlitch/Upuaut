@@ -3089,6 +3089,8 @@ class Spinner:
 
 			os.abort()
 
+		self.WINDOW = None
+
 	@staticmethod
 	def wait(filename, confidence=0.9, check_fail=False, check_count=7, click=True):
 		fails = 0
@@ -3112,18 +3114,6 @@ class Spinner:
 				return 1
 
 			time.sleep(5)
-
-	@staticmethod
-	def open_wheel():
-		time.sleep(1)
-
-		while True:
-			header = pyautogui.locateCenterOnScreen('images/header.png', confidence=0.8)
-
-			if header:
-				break
-
-		pyautogui.click(header[0], header[1] + 35)
 
 	def kill(self):
 		for p in psutil.process_iter():
@@ -3177,14 +3167,17 @@ class Spinner:
 				print(f'{Style.BRIGHT}{Fore.GREEN}Spinned!')
 
 	def prepare(self):
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for game load...')
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Opening the game...')
 
 		while self.wait('game.png', check_fail=True):
 			self.home()
 
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for the game to load...')
+
 		self.wait('profile.png', click=False)
 		self.wait('cancel.png', check_fail=True, check_count=3)
-		self.open_wheel()
+
+		pyautogui.click(self.WINDOW.left, self.WINDOW.top + 40)
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Game loaded!')
 
@@ -3202,6 +3195,8 @@ class Spinner:
 		try:
 			window = pygetwindow.getWindowsWithTitle(self.BLUESTACKS5_NAME)[0]
 			window.size = (540, 934)
+
+			self.WINDOW = window
 		except IndexError:
 			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window is invalid!{Back.RESET}')
 
