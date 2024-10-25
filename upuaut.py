@@ -3089,8 +3089,6 @@ class Spinner:
 
 			os.abort()
 
-		self.WINDOW = None
-
 	@staticmethod
 	def wait(filename, confidence=0.9, check_fail=False, check_count=7, click=True):
 		fails = 0
@@ -3177,7 +3175,8 @@ class Spinner:
 		self.wait('profile.png', click=False)
 		self.wait('cancel.png', check_fail=True, check_count=3)
 
-		pyautogui.click(self.WINDOW.left, self.WINDOW.top + 40)
+		window = pygetwindow.getWindowsWithTitle(self.BLUESTACKS5_NAME)[0]
+		pyautogui.click(window.left + 30, window.top + 60)
 
 		print(f'{Style.BRIGHT}{Fore.GREEN}Game loaded!')
 
@@ -3195,8 +3194,6 @@ class Spinner:
 		try:
 			window = pygetwindow.getWindowsWithTitle(self.BLUESTACKS5_NAME)[0]
 			window.size = (540, 934)
-
-			self.WINDOW = window
 		except IndexError:
 			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window is invalid!{Back.RESET}')
 
