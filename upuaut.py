@@ -2130,8 +2130,9 @@ class Booster:
 
 					player_base_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
 					player_img_base_locator = self.page.locator(f'xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div[1]/div/div[1]/div[1]/div[2]/div[2]/div/div[1]/div/div[{i}]/div[{j}]/div')
-					name_locator = player_base_locator.locator('xpath=/div[1]/div')
+					name_locator = player_base_locator.locator('xpath=/div[1]/div/div[4]/div/div')
 					name = name_locator.text_content(timeout=1000).split(' ')[1]
+
 					icons = player_img_base_locator.evaluate('''
 						(player) => {
 							let sources = [];
@@ -2378,7 +2379,7 @@ class Booster:
 					if close_popup_button.text_content(timeout=1000) == 'Окей':
 						close_popup_button.click()
 				except PlaywrightTimeoutError:
-					self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div[2]/div/div/div/div/div[1]/div[2]/div[2]/div[3]/div[5]/div[1]/div/div').click(timeout=1000)
+					input(f'\n{Style.BRIGHT}{Fore.YELLOW}Go to the main menu and press Enter!{Back.RESET}')
 
 				return
 
