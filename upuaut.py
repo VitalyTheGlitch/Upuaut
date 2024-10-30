@@ -2327,8 +2327,8 @@ class Booster:
 							break
 					except PlaywrightTimeoutError:
 						try:
-							start_game_button = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[1]/div[1]/div[2]')
-							
+							start_game_button = self.page.locator('xpath=/html/body/div[1]/div/div/div/div/div[1]/div/div/div/div/div/div/div/div/div/div/div/div/div[1]/div[1]/div[2]/div[4]/div[2]/div/div/div')
+
 							if start_game_button.text_content(timeout=1000) == 'НАЧАТЬ ИГРУ':
 								start_game_button.click()
 						except PlaywrightTimeoutError:
@@ -2379,7 +2379,7 @@ class Booster:
 					if close_popup_button.text_content(timeout=1000) == 'Окей':
 						close_popup_button.click()
 				except PlaywrightTimeoutError:
-					input(f'\n{Style.BRIGHT}{Fore.YELLOW}Go to the main menu and press Enter!{Back.RESET}')
+					pass
 
 				return
 
