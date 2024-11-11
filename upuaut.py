@@ -487,6 +487,12 @@ class Tracker:
 
 		roles['red-lady'] = roles.pop('harlot')
 
+		roles['journalist'] = {
+			'team': 'VILLAGER',
+			'aura': 'GOOD',
+			'name': 'Journalist'
+		}
+
 		roles['random-villager-support'] = {
 			'team': 'VILLAGER',
 			'aura': 'GOOD',
