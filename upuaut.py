@@ -2502,8 +2502,8 @@ class Stalker:
 		self.TARGETS = {}
 		self.updating = False
 
-		self.CLAN_CHANGES = set()
-		self.INFO_CHANGES = set()
+		self.CLAN_CHANGES = {}
+		self.INFO_CHANGES = {}
 
 		self.load_targets()
 		
@@ -2832,16 +2832,18 @@ class Stalker:
 		for i, target in enumerate(self.TARGETS.values()):
 			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
 			target = deepcopy(target[-1])
+			target_id = target['id']
+
+			self.CLAN_CHANGES[target_id] = set()
+			self.INFO_CHANGES[target_id] = set()
 
 			changes = self.get_changes(prev_target, target)
 
 			if changes:
-				self.CLAN_CHANGES.update(changes[0])
-				self.INFO_CHANGES.update(changes[1])
+				self.CLAN_CHANGES[target_id].update(changes[0])
+				self.INFO_CHANGES[target_id].update(changes[1])
 
 				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
-				
-				break
 
 		self.updating = False
 
@@ -2853,25 +2855,22 @@ class Stalker:
 		for i, target in enumerate(self.TARGETS.values()):
 			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
 			target = deepcopy(target[-1])
+			player_id = target['id']
 
 			for field in target:
 				if field == 'status':
 					continue
 
-				if field in self.INFO_CHANGES:
+				if field in self.INFO_CHANGES.get(player_id, []):
 					target[field] = f'{Fore.GREEN}{target[field]}{Fore.RESET}'
 
 			for field in target['clan']:
 				if 'xp' in field and target['clan'][field]:
 					target['clan'][field] = str(target['clan'][field]) + 'xp'
 
-				if field in self.CLAN_CHANGES:
+				if field in self.CLAN_CHANGES.get(player_id, []):
 					target['clan'][field] = f'{Fore.GREEN}{target["clan"][field]}{Fore.RESET}'
 
-			self.CLAN_CHANGES = set()
-			self.INFO_CHANGES = set()
-
-			player_id = target['id']
 			name = target['name']
 			level = target['level']
 			bio = target['bio']
@@ -2926,7 +2925,9 @@ class Stalker:
 				info += '\n'
 
 			info += f'{bio}\n'
-			info += f'🌹 {received_roses} {sent_roses}\n'
+
+			if received_roses != -1:
+				info += f'🌹 {received_roses} {sent_roses}\n'
 
 			if win_count != -1:
 				info += f'🥇 {win_count} ❌ {lose_count} ☠  {tie_count}\n'
