@@ -493,6 +493,12 @@ class Tracker:
 			'name': 'Journalist'
 		}
 
+		roles['ghost-wolf'] = {
+			'team': 'WEREWOLF',
+			'aura': 'EVIL',
+			'name': 'Ghost wolf'
+		}
+
 		roles['random-villager-support'] = {
 			'team': 'VILLAGER',
 			'aura': 'GOOD',
