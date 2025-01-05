@@ -181,16 +181,11 @@ class Tracker:
 		self.last_message_number = 0
 
 	@staticmethod
-	def calculate_player_min_level(received_roses, sent_roses, win_count, lose_count, clan_xp):
+	def predict_player_level(received_roses, sent_roses, win_count, lose_count, clan_xp):
 		min_levels = [
 			(clan_xp // 2000) if clan_xp != -1 else 1,
-			(win_count * 60 + lose_count * 20) * 1.5 // 2000 if win_count != -1 else 1,
-			(received_roses + sent_roses) // 20
+			(received_roses + sent_roses) // 20 or 1
 		]
-
-		for i in range(len(min_levels)):
-			if not min_levels[i]:
-				min_levels[i] = 1
 
 		return max(min_levels)
 
@@ -202,6 +197,16 @@ class Tracker:
 			'Authorization': f'Bot {api_key}',
 			'Accept': 'application/json',
 			'Content-Type': 'application/json'
+		}
+
+	def get_bearer(self):
+		self.BEARER_TOKEN = self.page.evaluate('() => JSON.parse(localStorage.getItem("authtokens"))["idToken"]')
+		self.CF_JWT = self.page.evaluate('() => localStorage.getItem("cloudflare-turnstile-jwt")')
+
+		self.BEARER_HEADERS = {
+			'Authorization': f'Bearer {self.BEARER_TOKEN}',
+			'Cf-Jwt': f'{self.CF_JWT}',
+			'Ids': '1'
 		}
 
 	def switch_api_key(self):
@@ -260,38 +265,38 @@ class Tracker:
 			(field, [messages_html]) => {
 				if (!document.querySelector(".modal-header")) {
 					function Modal(modal_selector) {
-					    const modal = document.querySelector(modal_selector);
-					    const header = modal.querySelector('.modal-header');
-					    const body = modal.querySelector('.modal-body');
-					    const buttonClose = modal.querySelector('.close-modal');
+						const modal = document.querySelector(modal_selector);
+						const header = modal.querySelector('.modal-header');
+						const body = modal.querySelector('.modal-body');
+						const buttonClose = modal.querySelector('.close-modal');
 
-					    buttonClose.addEventListener('click', closeModal, false);
-					    modal.addEventListener('click', (e) => e.stopPropagation());
+						buttonClose.addEventListener('click', closeModal, false);
+						modal.addEventListener('click', (e) => e.stopPropagation());
 
-					    function setHeader(text) {
-					        header.firstChild.nodeValue = text;
-					    }
+						function setHeader(text) {
+							header.firstChild.nodeValue = text;
+						}
 
-					    function setBody(text) {
-					        body.innerHTML = text;
-					    }
+						function setBody(text) {
+							body.innerHTML = text;
+						}
 
-					    function openModal(e) {
-					        e && e.stopPropagation();
+						function openModal(e) {
+							e && e.stopPropagation();
 
-					        modal.classList.add('opened');
-					        modal.classList.remove('closed');
-					    }
+							modal.classList.add('opened');
+							modal.classList.remove('closed');
+						}
 
-					    function closeModal() {
-					        modal.classList.remove('opened');
-					        modal.classList.add('closed');
-					    }
+						function closeModal() {
+							modal.classList.remove('opened');
+							modal.classList.add('closed');
+						}
 
-					    this.setHeader = setHeader;
-					    this.setBody = setBody;
-					    this.open = openModal;
-					    this.close = closeModal;
+						this.setHeader = setHeader;
+						this.setBody = setBody;
+						this.open = openModal;
+						this.close = closeModal;
 					}
 
 					const html = document.createElement("div");
@@ -629,7 +634,7 @@ class Tracker:
 		clan_id = data.get('clanId')
 		clan_xp = self.get_player_clan_xp(clan_id, player_id)
 
-		min_level = self.calculate_player_min_level(
+		min_level = self.predict_player_level(
 			received_roses,
 			sent_roses,
 			win_count,
@@ -1116,16 +1121,6 @@ class Tracker:
 				rotation.append(rotation.pop(rotation.index(r)))
 
 		return rotation
-
-	def get_bearer(self):
-		self.BEARER_TOKEN = self.page.evaluate('() => JSON.parse(localStorage.getItem("authtokens"))["idToken"]')
-		self.CF_JWT = self.page.evaluate('() => localStorage.getItem("cloudflare-turnstile-jwt")')
-
-		self.BEARER_HEADERS = {
-			'Authorization': f'Bearer {self.BEARER_TOKEN}',
-			'Cf-Jwt': f'{self.CF_JWT}',
-			'Ids': '1'
-		}
 
 	def update_players(self):
 		updates = 0
@@ -2486,6 +2481,42 @@ class Stalker:
 			os.abort()
 
 		try:
+			self.CHROME_EXECUTABLE = self.config['CHROME_EXECUTABLE']
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome not found!{Back.RESET}')
+
+			os.abort()
+
+		if not os.path.isfile(self.CHROME_EXECUTABLE):
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.CHROME_USER_DATA = os.path.join(self.config['CHROME_USER_DATA'], 'Upuaut')
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome User Data not found!{Back.RESET}')
+
+			os.abort()
+
+		if not os.path.isdir(self.CHROME_USER_DATA):
+			input(f'{Style.BRIGHT}{Back.RED}Path to Chrome User Data is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
+			self.CHROME_VIEWPORT = self.config['CHROME_VIEWPORT'].split(',')
+		except KeyError:
+			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport not found!{Back.RESET}')
+
+			os.abort()
+
+		if len(self.CHROME_VIEWPORT) != 2:
+			input(f'{Style.BRIGHT}{Back.RED}Browser Viewport is invalid!{Back.RESET}')
+
+			os.abort()
+
+		try:
 			TIMEZONE = self.config['TIMEZONE']
 		except KeyError:
 			input(f'{Style.BRIGHT}{Back.RED}Timezone not found!{Back.RESET}')
@@ -2500,19 +2531,27 @@ class Stalker:
 			os.abort()
 
 		self.ntp = ntplib.NTPClient()
-		self.NTP_SERVER = 'pool.ntp.org'
+		self.NTP_SERVER = 'time.google.com'
 
 		self.API_KEY = self.switch_api_key()
 
-		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
-		self.TARGETS = {}
-		self.updating = False
+		self.BEARER_TOKEN = None
+		self.CF_JWT = None
 
+		self.BOT_BASE_URL = 'https://api.wolvesville.com/'
+		self.BEARER_BASE_URL = 'https://core.api-wolvesville.com/'
+
+		self.BEARER_HEADERS = {}
+
+		self.TARGETS = {}
 		self.CLAN_CHANGES = {}
 		self.INFO_CHANGES = {}
 
+		self.updating = False
+		self.page = None
+
 		self.load_targets()
-		
+
 		threading.Thread(target=self.auto_update, daemon=True).start()
 
 	@staticmethod
@@ -2533,6 +2572,16 @@ class Stalker:
 			'Authorization': f'Bot {api_key}',
 			'Accept': 'application/json',
 			'Content-Type': 'application/json'
+		}
+
+	def get_bearer(self):
+		self.BEARER_TOKEN = self.page.evaluate('() => JSON.parse(localStorage.getItem("authtokens"))["idToken"]')
+		self.CF_JWT = self.page.evaluate('() => localStorage.getItem("cloudflare-turnstile-jwt")')
+
+		self.BEARER_HEADERS = {
+			'Authorization': f'Bearer {self.BEARER_TOKEN}',
+			'Cf-Jwt': f'{self.CF_JWT}',
+			'Ids': '1'
 		}
 
 	def normalize_time(self, dt):
@@ -2719,6 +2768,41 @@ class Stalker:
 
 		return 0, data
 
+	def predict_level_by_xp(self, player_id):
+		ENDPOINT = 'highScores/top100Friends'
+
+		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS, verify=False)
+
+		if not data.ok:
+			return
+
+		data = data.json()['ranks']
+		player = dict((d['playerId'], dict(xp=d['xp'])) for d in data).get(player_id)
+
+		if not player:
+			return
+
+		k = 0.000500205
+		b = 8.85
+
+		level = int(k * player['xp'] + b)
+
+		return level
+
+	def get_player_friends_count(self, player_id):
+		ENDPOINT = f'players/{player_id}'
+
+		data = requests.get(f'{self.BEARER_BASE_URL}{ENDPOINT}', headers=self.BEARER_HEADERS, verify=False)
+
+		if not data.ok:
+			return -1
+
+		data = data.json()
+
+		friends_count = int(data['friendsCount'])
+
+		return friends_count
+
 	def get_player(self, player_id):
 		ENDPOINT = f'players/{player_id}'
 
@@ -2735,8 +2819,26 @@ class Stalker:
 		bio = data.get('personalMessage')
 		status = data.get('status')
 
+		friends_count = self.get_player_friends_count(player_id)
+
+		if friends_count == -1:
+			if self.TARGETS[player_id]:		
+				friends_count = self.TARGETS[player_id][0]['friends_count']
+
+			else:
+				friends_count = -1
+
 		if level == -1:
-			level = '?'
+			time.sleep(0.5)
+
+			level = self.predict_level_by_xp(player_id)
+
+			if not level:
+				if self.TARGETS[player_id]:		
+					level = self.TARGETS[player_id][0]['level']
+
+				else:
+					level = '?'
 
 		if status == 'PLAY':
 			status = '✅'
@@ -2792,6 +2894,7 @@ class Stalker:
 			'status': status,
 			'last_online': last_online,
 			'created': created,
+			'friends_count': friends_count,
 			'received_roses': received_roses,
 			'sent_roses': sent_roses,
 			'win_count': win_count,
@@ -2833,7 +2936,7 @@ class Stalker:
 
 			self.write_target(target_id, data[1])
 
-			time.sleep(1)
+			time.sleep(0.5)
 
 		for i, target in enumerate(self.TARGETS.values()):
 			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
@@ -2885,6 +2988,8 @@ class Stalker:
 			last_online = target['last_online']
 			created = target['created']
 
+			friends_count = target['friends_count']
+
 			received_roses = target['received_roses']
 			sent_roses = target['sent_roses']
 
@@ -2909,7 +3014,7 @@ class Stalker:
 			clan = target['clan']
 
 			clan_name = clan.get('name')
-			tag = clan.get('tag', '')
+			tag = clan.get('tag') or ''
 			language = clan.get('language')
 			member_count = clan.get('member_count')
 			player_xp = clan.get('player_xp', '?xp')
@@ -2931,6 +3036,9 @@ class Stalker:
 				info += '\n'
 
 			info += f'{bio}\n'
+
+			if friends_count != -1:
+				info += f'👤 {friends_count}\n'
 
 			if received_roses != -1:
 				info += f'🌹 {received_roses} {sent_roses}\n'
@@ -3067,11 +3175,44 @@ class Stalker:
 		banner(self.__class__.__name__)
 
 		try:
-			while True:
-				self.monitor()
+			with sync_playwright() as playwright:
+				print(f'{Style.BRIGHT}{Fore.YELLOW}Opening website...')
 
-				if self.process():
-					break
+				context = playwright.chromium.launch_persistent_context(
+					user_data_dir=self.CHROME_USER_DATA,
+					viewport={
+						'width': int(self.CHROME_VIEWPORT[0]),
+						'height': int(self.CHROME_VIEWPORT[1])
+					},
+					executable_path=self.CHROME_EXECUTABLE,
+					args=[
+						'--window-position=-7,40',
+						'--mute-audio',
+						'--disable-blink-features=AutomationControlled'
+					],
+					ignore_default_args=['--enable-automation'],
+					chromium_sandbox=True
+				)
+
+				self.page = context.pages[0]
+				
+				while True:
+					try:
+						self.page.goto('https://wolvesville.com', wait_until='commit', timeout=100000)
+
+						break
+					except PlaywrightTimeoutError:
+						print(f'{Style.BRIGHT}{Fore.RED}Timeout error!{Fore.RESET}')
+
+						continue
+
+				self.get_bearer()
+
+				while True:
+					self.monitor()
+
+					if self.process():
+						break
 		except KeyboardInterrupt:
 			return
 		except Exception as e:
