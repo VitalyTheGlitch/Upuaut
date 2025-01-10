@@ -2626,11 +2626,14 @@ class Stalker:
 			json.dump(self.TARGETS, targets_file, ensure_ascii=False)
 
 	def get_current_time(self):
-		data = self.ntp.request(self.NTP_SERVER)
+		try:
+			data = self.ntp.request(self.NTP_SERVER)
+		
+			return time.ctime(data.tx_time)
+		except ntplib.NTPException:
+			return
 
-		return time.ctime(data.tx_time)
-
-	def add_changes(self, prev_target, target, diff, clan=False):
+	def add_changes(self, prev_target, target, diff, current_time, clan=False):
 		if not os.path.isdir('targets'):
 			os.mkdir('targets')
 
@@ -2642,8 +2645,6 @@ class Stalker:
 
 		if diff:
 			with open(f'targets/{target_id}.txt', 'a', encoding='utf-8') as f:
-				current_time = self.get_current_time()
-
 				f.write(f'{current_time}\n\n')
 
 				if not target:
@@ -2675,7 +2676,7 @@ class Stalker:
 
 	def auto_update(self):
 		while True:
-			time.sleep(random.randint(60, 600))
+			time.sleep(random.randint(60, 300))
 
 			self.update_targets()
 
@@ -2698,8 +2699,11 @@ class Stalker:
 		if not any([info_diff, clan_diff]):
 			return
 
-		self.add_changes(prev_target, target, clan_diff, True)
-		self.add_changes(prev_target, target, info_diff)
+		current_time = self.get_current_time()
+
+		if current_time:
+			self.add_changes(prev_target, target, clan_diff, current_time, True)
+			self.add_changes(prev_target, target, info_diff, current_time)
 
 		return clan_diff, info_diff
 
@@ -2822,20 +2826,20 @@ class Stalker:
 		friends_count = self.get_player_friends_count(player_id)
 
 		if friends_count == -1:
-			if self.TARGETS[player_id]:		
-				friends_count = self.TARGETS[player_id][0]['friends_count']
+			if self.TARGETS.get(player_id):		
+				friends_count = self.TARGETS[player_id][-1]['friends_count']
 
 			else:
 				friends_count = -1
 
 		if level == -1:
-			time.sleep(0.5)
+			time.sleep(1)
 
 			level = self.predict_level_by_xp(player_id)
 
 			if not level:
-				if self.TARGETS[player_id]:		
-					level = self.TARGETS[player_id][0]['level']
+				if self.TARGETS.get(player_id):		
+					level = self.TARGETS[player_id][-1]['level']
 
 				else:
 					level = '?'
@@ -2920,11 +2924,7 @@ class Stalker:
 
 		self.updating = True
 
-		if target_id:
-			targets = [target_id]
-
-		else:
-			targets = list(self.TARGETS)
+		targets = [target_id] if target_id else list(self.TARGETS)
 
 		for target_id in targets:
 			data = self.get_player(target_id)
@@ -2936,7 +2936,9 @@ class Stalker:
 
 			self.write_target(target_id, data[1])
 
-			time.sleep(0.5)
+			time.sleep(1)
+
+		changes_detected = False
 
 		for i, target in enumerate(self.TARGETS.values()):
 			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
@@ -2949,10 +2951,13 @@ class Stalker:
 			changes = self.get_changes(prev_target, target)
 
 			if changes:
+				changes_detected = True
+
 				self.CLAN_CHANGES[target_id].update(changes[0])
 				self.INFO_CHANGES[target_id].update(changes[1])
 
-				threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
+		if changes_detected:
+			threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
 
 		self.updating = False
 
