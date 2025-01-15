@@ -1,6 +1,7 @@
 import requests
 import threading
 import pyautogui
+import pywinauto
 import pygetwindow
 import psutil
 import ntplib
@@ -13,6 +14,7 @@ import pytz
 import time
 import random
 from undetected_playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from collections import OrderedDict
 from copy import deepcopy
 from playsound import playsound
 from colorama import Back, Fore, Style, init
@@ -491,18 +493,6 @@ class Tracker:
 		roles['cursed'] = roles.pop('cursed-human')
 
 		roles['red-lady'] = roles.pop('harlot')
-
-		roles['journalist'] = {
-			'team': 'VILLAGER',
-			'aura': 'GOOD',
-			'name': 'Journalist'
-		}
-
-		roles['ghost-wolf'] = {
-			'team': 'WEREWOLF',
-			'aura': 'EVIL',
-			'name': 'Ghost wolf'
-		}
 
 		roles['random-villager-support'] = {
 			'team': 'VILLAGER',
@@ -2543,12 +2533,13 @@ class Stalker:
 
 		self.BEARER_HEADERS = {}
 
-		self.TARGETS = {}
+		self.TARGETS = OrderedDict()
 		self.CLAN_CHANGES = {}
 		self.INFO_CHANGES = {}
 
 		self.updating = False
 		self.page = None
+		self.monitor_page = 1
 
 		self.load_targets()
 
@@ -2563,6 +2554,28 @@ class Stalker:
 		minutes = str(minutes % 60).zfill(2)
 
 		return f'{hours}:{minutes}'
+
+	@staticmethod
+	def help_message(error=False):
+		color = Fore.RED if error else Fore.YELLOW
+
+		print(f'{Style.BRIGHT}{color}Usage:')
+		print(f'{Style.BRIGHT}{color}Add [IN-GAME NAME]')
+		print(f'{Style.BRIGHT}{color}Delete [ID]')
+		print(f'{Style.BRIGHT}{color}Move [NEW ID] to [NEW ID]')
+		print(f'{Style.BRIGHT}{color}Update - update all players')
+		print(f'{Style.BRIGHT}{color}Update [ID] - update chosen player')
+		print(f'{Style.BRIGHT}{color}P [PAGE]')
+		print(f'{Style.BRIGHT}{color}L - previous page')
+		print(f'{Style.BRIGHT}{color}R - next page')
+		print(f'{Style.BRIGHT}{color}Enter to refresh')
+		print(f'{Style.BRIGHT}{color}End - stop Stalker')
+
+		input() if error else print()
+
+	@property
+	def total_pages(self):
+		return max(len(self.TARGETS) // 5 + int(len(self.TARGETS) % 5 > 0), 1)
 
 	@property
 	def bot_headers(self):
@@ -2602,9 +2615,9 @@ class Stalker:
 	def load_targets(self):
 		try:
 			with open('data/targets.json', 'r', encoding='utf-8') as targets_file:
-				self.TARGETS = json.load(targets_file)
+				self.TARGETS = json.load(targets_file, object_pairs_hook=OrderedDict)
 		except:
-			self.TARGETS = {}
+			self.TARGETS = OrderedDict()
 
 	def write_target(self, target_id, info=None):
 		if not os.path.isdir('targets'):
@@ -2621,6 +2634,10 @@ class Stalker:
 
 			if len(self.TARGETS[target_id]) == 3:
 				self.TARGETS[target_id].pop(0)
+
+	def save_targets(self):
+		if not os.path.isdir('data'):
+			os.mkdir('data')
 
 		with open('data/targets.json', 'w', encoding='utf-8') as targets_file:
 			json.dump(self.TARGETS, targets_file, ensure_ascii=False)
@@ -2803,7 +2820,7 @@ class Stalker:
 
 		data = data.json()
 
-		friends_count = int(data['friendsCount'])
+		friends_count = int(data.get('friendsCount', -1))
 
 		return friends_count
 
@@ -2826,7 +2843,7 @@ class Stalker:
 		friends_count = self.get_player_friends_count(player_id)
 
 		if friends_count == -1:
-			if self.TARGETS.get(player_id):		
+			if self.TARGETS.get(player_id):
 				friends_count = self.TARGETS[player_id][-1]['friends_count']
 
 			else:
@@ -2927,7 +2944,10 @@ class Stalker:
 		targets = [target_id] if target_id else list(self.TARGETS)
 
 		for target_id in targets:
-			data = self.get_player(target_id)
+			try:
+				data = self.get_player(target_id)
+			except requests.exceptions.ConnectionError:
+				continue
 
 			if data[0]:
 				input(f'\n{Style.BRIGHT}{Back.RED}Error {data[0]}: {data[1]}{Back.RESET}')
@@ -2957,6 +2977,8 @@ class Stalker:
 				self.INFO_CHANGES[target_id].update(changes[1])
 
 		if changes_detected:
+			self.save_targets()
+
 			threading.Thread(target=playsound, args=('audio/illusionist.mp3',), daemon=True).start()
 
 		self.updating = False
@@ -2964,9 +2986,14 @@ class Stalker:
 	def monitor(self):
 		banner(self.__class__.__name__)
 
+		targets_range = range((self.monitor_page - 1) * 5, self.monitor_page * 5)
+		pages_info = f'{Fore.YELLOW}PAGE {self.monitor_page}/{self.total_pages}{Fore.RESET}\n\n'
 		targets_info = ''
 
 		for i, target in enumerate(self.TARGETS.values()):
+			if i not in targets_range:
+				continue
+
 			prev_target = deepcopy(target[0]) if len(target) == 2 else {}
 			target = deepcopy(target[-1])
 			player_id = target['id']
@@ -3072,17 +3099,10 @@ class Stalker:
 			targets_info += info + '\n'
 
 		if targets_info:
-			print(f'{Style.BRIGHT}{targets_info}')
+			print(f'{Style.BRIGHT}{pages_info}{targets_info}')
 
 		else:
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Usage:')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Add [IN-GAME NAME]')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Delete [ID]')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Update - update all players')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Update [ID] - update chosen player')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}Enter to refresh')
-			print(f'{Style.BRIGHT}{Fore.YELLOW}End - stop Stalker')
-			print()
+			self.help_message()
 
 	def process(self):
 		cmd = input(f'{Style.BRIGHT}{Fore.RED}>{Fore.RESET} ')
@@ -3096,23 +3116,46 @@ class Stalker:
 		elif cmd.lower() == 'update':
 			self.update_targets()
 
+		elif cmd.lower().startswith('move'):
+			try:
+				old_id, new_id = map(int, cmd.split('move ')[1].split(' to '))
+
+				if not 1 <= old_id <= len(self.TARGETS):
+					input(f'\n{Style.BRIGHT}{Back.RED}Invalid old ID!{Back.RESET}')
+
+				elif not 1 <= new_id <= len(self.TARGETS):
+					input(f'\n{Style.BRIGHT}{Back.RED}Invalid new ID!{Back.RESET}')
+
+				else:
+					self.TARGETS.move_to_end(list(self.TARGETS)[old_id - 1])
+
+					for target in list(self.TARGETS)[new_id - 1:-1]:
+						self.TARGETS.move_to_end(target)
+
+					self.save_targets()
+			except (ValueError, IndexError):
+				input(f'\n{Style.BRIGHT}{Back.RED}Invalid IDs!{Back.RESET}')
+
+				return
+
+		elif cmd.lower() == 'l':
+			if self.monitor_page != 1:
+				self.monitor_page -= 1
+
+		elif cmd.lower() == 'r':
+			if self.monitor_page != self.total_pages:
+				self.monitor_page += 1
+
 		else:
 			try:
 				cmd, target = cmd.split(' ')
 			except ValueError:
-				print(f'\n{Style.BRIGHT}{Fore.RED}Usage:')
-				print(f'{Style.BRIGHT}{Fore.RED}Add [IN-GAME NAME]')
-				print(f'{Style.BRIGHT}{Fore.RED}Delete [ID]')
-				print(f'{Style.BRIGHT}{Fore.RED}Update - update all players')
-				print(f'{Style.BRIGHT}{Fore.RED}Update [ID] - update chosen player')
-				print(f'{Style.BRIGHT}{Fore.RED}Enter to refresh')
-				print(f'{Style.BRIGHT}{Fore.RED}End - stop Stalker')
-				input()
+				self.help_message(True)
 
 				return
 
 			if cmd.lower() == 'add':
-				if len(self.TARGETS) == 20:
+				if len(self.TARGETS) == 50:
 					input(f'\n{Style.BRIGHT}{Back.RED}Too many targets!{Back.RESET}')
 
 					return
@@ -3144,6 +3187,10 @@ class Stalker:
 					return
 
 				self.write_target(target_id, data[1])
+				self.save_targets()
+
+				if self.monitor_page == self.total_pages - 1:
+					self.monitor_page += 1
 
 			elif cmd.lower() == 'delete':
 				try:
@@ -3156,6 +3203,10 @@ class Stalker:
 						target_id = list(self.TARGETS)[target]
 
 						self.write_target(target_id)
+						self.save_targets()
+
+						if self.monitor_page == self.total_pages + 1:
+							self.monitor_page -= 1
 				except (ValueError, IndexError):
 					input(f'\n{Style.BRIGHT}{Back.RED}Invalid ID!{Back.RESET}')
 
@@ -3172,6 +3223,18 @@ class Stalker:
 						self.update_targets(target_id)
 				except (ValueError, IndexError):
 					input(f'\n{Style.BRIGHT}{Back.RED}Invalid ID!{Back.RESET}')
+
+			elif cmd.lower() == 'p':
+				try:
+					target = int(target)
+
+					if 1 <= target <= self.total_pages:
+						self.monitor_page = target
+
+					else:
+						input(f'\n{Style.BRIGHT}{Back.RED}Incorrect page!{Back.RESET}')
+				except ValueError:
+					input(f'\n{Style.BRIGHT}{Back.RED}Incorrect page!{Back.RESET}')
 
 			else:
 				input(f'\n{Style.BRIGHT}{Back.RED}Incorrect command!{Back.RESET}')
@@ -3245,9 +3308,11 @@ class Spinner:
 		try:
 			self.BLUESTACKS5_NAME = self.config['BLUESTACKS5_NAME']
 		except KeyError:
-			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window not found!{Back.RESET}')
+			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 not found!{Back.RESET}')
 
 			os.abort()
+
+		self.app = None
 
 	@staticmethod
 	def wait(filename, confidence=0.9, check_fail=False, check_count=7, click=True):
@@ -3274,27 +3339,19 @@ class Spinner:
 			time.sleep(5)
 
 	def kill(self):
+		self.app = None
+
 		for p in psutil.process_iter():
 			if p.name() == 'HD-Player.exe':
 				p.kill()
 
 				return
 
-	def back(self):
-		self.wait('back.png')
-
-	def home(self):
-		self.wait('home.png')
-
-	def close_all(self):
-		self.wait('recent.png')
-		self.wait('clear.png')
-
 	def spin(self):
 		while True:
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking ad button...')
 
-			pyautogui.moveTo(100, 100)
+			self.app.Dialog.click_input(coords=(0, 0))
 
 			if not self.wait('done.png', confidence=0.8, check_fail=True, check_count=2):
 				print(f'{Style.BRIGHT}{Fore.GREEN}DONE!')
@@ -3312,7 +3369,7 @@ class Spinner:
 
 			time.sleep(35)
 
-			self.back()
+			self.app[self.BLUESTACKS5_NAME].Button0.click()
 
 			print(f'{Style.BRIGHT}{Fore.YELLOW}Checking spin button...')
 
@@ -3325,39 +3382,32 @@ class Spinner:
 				print(f'{Style.BRIGHT}{Fore.GREEN}Spinned!')
 
 	def prepare(self):
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Opening the game...')
-
-		while self.wait('game.png', check_fail=True):
-			self.home()
-
-		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for the game to load...')
-
-		self.wait('profile.png', click=False)
-		self.wait('cancel.png', check_fail=True, check_count=3)
-
-		window = pygetwindow.getWindowsWithTitle(self.BLUESTACKS5_NAME)[0]
-		pyautogui.click(window.left + 30, window.top + 60)
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}Game loaded!')
-
-	def run(self):
 		banner(self.__class__.__name__)
 
 		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for BlueStacks 5...')
 
-		subprocess.Popen(self.BLUESTACKS5_EXECUTABLE, stdout=subprocess.PIPE)
-
-		self.home()
-
-		print(f'{Style.BRIGHT}{Fore.GREEN}BlueStacks 5 found!')
-
+		subprocess.Popen([self.BLUESTACKS5_EXECUTABLE, '--cmd', 'launchApp', '--package', 'com.werewolfapps.online'], stdout=subprocess.PIPE)
+		
 		try:
+			self.app = pywinauto.Application(backend='uia').connect(title=self.BLUESTACKS5_NAME, timeout=10)
+
 			window = pygetwindow.getWindowsWithTitle(self.BLUESTACKS5_NAME)[0]
 			window.size = (540, 934)
 		except IndexError:
 			input(f'{Style.BRIGHT}{Back.RED}Name of BlueStacks 5 window is invalid!{Back.RESET}')
 
 			os.abort()
+
+		print(f'{Style.BRIGHT}{Fore.YELLOW}Waiting for the game to load...')
+
+		self.wait('profile.png', click=False)
+		self.wait('cancel.png', check_fail=True, check_count=3)
+		self.app.Dialog.click_input(coords=(80, 40))
+
+		print(f'{Style.BRIGHT}{Fore.GREEN}Game loaded!')
+
+	def run(self):
+		banner(self.__class__.__name__)
 
 		try:
 			while True:
@@ -3373,12 +3423,15 @@ class Spinner:
 
 				print(f'{Style.BRIGHT}{Fore.YELLOW}Restarting...')
 
-				self.close_all()
+				self.app.Dialog['HD-Player'].type_keys('^+5')
+
+				time.sleep(1)
+
+				self.app.Dialog['HD-Player'].type_keys('{DEL}{ESC}')
 		except KeyboardInterrupt:
 			self.kill()
 
 			return
-
 
 def banner(module=None):
 	os.system('cls' if os.name == 'nt' else 'clear')

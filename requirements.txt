@@ -7,5 +7,6 @@ PyGetWindow
 python-dateutil
 python-dotenv
 pytz
+pywinauto
 requests
 undetected-playwright-patch
